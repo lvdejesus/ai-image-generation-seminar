@@ -22,6 +22,7 @@ const progress = document.querySelector<HTMLElement>('#progress')!
 const hud = document.querySelector<HTMLElement>('#hud')!
 const overview = document.querySelector<HTMLElement>('#overview')!
 const tip = document.querySelector<HTMLElement>('#tip')!
+const setup = document.querySelector<HTMLElement>('#setup')!
 
 // Scenes in order. A scene covers one or more consecutive beats.
 const builders: SceneBuilder[] = [intro, noising, training, reverse, generate, prompt, latent, pipeline]
@@ -164,6 +165,49 @@ function toggleOverview(open = overview.hidden) {
   if (open) overview.querySelector('.ov-card.current')?.scrollIntoView({ block: 'center' })
 }
 
+// ------------------------------------------------------------- live setup
+
+// On the first slide (or after pressing L), a small control in the corner
+// shows whether the live demo is connected and takes a pasted address.
+const setupButton = setup.querySelector('button')!
+const setupInput = setup.querySelector('input')!
+let setupPinned = false
+let setupNote = ''
+
+function updateSetup() {
+  const state = live.status()
+  const host = live.host()
+  const text = state === 'ready' ? `Live demo connected · ${host}` : state === 'connecting' ? `Live demo: connecting to ${host}…` : 'Live demo not set up · click to paste its address'
+  setup.querySelector<HTMLElement>('.dot')!.dataset.state = state === 'ready' ? 'live' : state === 'connecting' ? 'recorded' : 'idle'
+  setup.querySelector('span')!.textContent = setupNote || text
+}
+
+function showSetup(index: number) {
+  setup.hidden = index !== 0 && !setupPinned
+}
+
+setupButton.addEventListener('click', () => {
+  setupNote = ''
+  setupInput.hidden = false
+  setupInput.value = ''
+  setupInput.focus()
+  updateSetup()
+})
+setupInput.addEventListener('keydown', (e) => {
+  // Keys typed here never reach the deck's navigation.
+  e.stopPropagation()
+  if (e.key === 'Escape') setupInput.hidden = true
+  if (e.key !== 'Enter') return
+  const text = setupInput.value.trim()
+  if (!text) live.clear()
+  setupNote = text && !live.configure(text) ? 'Could not read an address from that · click to try again' : ''
+  setupInput.hidden = true
+  updateSetup()
+})
+setupInput.addEventListener('blur', () => (setupInput.hidden = true))
+live.onStatus(updateSetup)
+updateSetup()
+
 // ------------------------------------------------------------------ stage
 
 function fit() {
@@ -204,6 +248,7 @@ const deck = createDeck({
     updateProgress(index)
     updateOverview(index)
     updateHud()
+    showSetup(index)
   },
   onSettle: writeHash,
 })
@@ -242,6 +287,9 @@ window.addEventListener('keydown', (e) => {
     updateHud()
   } else if (key === 'f') {
     demo.panic()
+  } else if (key === 'l') {
+    setupPinned = !setupPinned
+    showSetup(deck.index())
   } else if (key === 'r') {
     setStartedAt(null)
     updateHud()

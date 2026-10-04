@@ -19,7 +19,8 @@ python3 tools/photos.py                          # re-download the photographs f
 cd site && pnpm thumbs                           # re-capture the overview thumbnails (dev server running)
 ```
 
-- `server/live.sh` prints one address, `https://<random>.trycloudflare.com/#live=…&token=…`, that works on any machine: the proxy serves the built site as well as the live demo. It also prints the fragment alone, for when the site is hosted elsewhere. Without the fragment the demo plays its recording.
+- `server/live.sh` prints one address, `https://<random>.trycloudflare.com/#live=…&token=…`, that works on any machine: the proxy serves the built site as well as the live demo. It also prints the fragment alone, for when the site is hosted elsewhere. Without an address the demo plays its recording.
+- The address does not have to be in the URL: the first slide has a small setup control in the corner. Click it, paste what `live.sh` printed (the full address or just the fragment), press Enter. The browser remembers it; an empty Enter forgets it.
 - For the proxy alone, the fragment is `#live=ws://localhost:8765/ws&token=<secret>`.
 - The proxy and the asset script need ComfyUI running on port 8188.
 - `pnpm build` writes the static site to `site/dist`.
@@ -32,6 +33,7 @@ cd site && pnpm thumbs                           # re-capture the overview thumb
 | Click the progress bar | Jump to that beat; hovering shows its title |
 | T / R | Presenter line (beat, elapsed time, pace, live status) / reset its timer |
 | F | Live demo only: abandon the live run and show the recording |
+| L | Show the live-demo setup on any slide (it is always on the first slide) |
 | Home / End | First or last beat |
 
 ## Model

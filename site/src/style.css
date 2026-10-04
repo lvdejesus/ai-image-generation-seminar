@@ -557,6 +557,47 @@ input.live-input::placeholder {
   color: var(--accent);
 }
 
+/* ----------------------------------------------------------- live setup */
+
+#setup {
+  position: absolute;
+  right: 104px;
+  bottom: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+#setup button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+#setup button:hover {
+  color: var(--ink);
+}
+
+#setup input {
+  width: 760px;
+  padding: 14px 18px;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 20px;
+  outline: none;
+}
+
 /* ------------------------------------------------------------- overview */
 
 #overview {
