@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Start the live proxy and a Cloudflare quick tunnel to it, then print the
-# fragment to add to the site's address. Ctrl+C stops both.
+# Build the site, start the live proxy (which also serves the site) and a
+# Cloudflare quick tunnel to it, then print the address to open on any
+# machine. Ctrl+C stops everything.
 #
 # A quick tunnel needs no Cloudflare account. Its address is random and
 # changes on every start, so run this before the talk and use the address
@@ -10,7 +11,10 @@ cd "$(dirname "$0")/.."
 
 export SEMINAR_TOKEN="${SEMINAR_TOKEN:-$(openssl rand -hex 16)}"
 export SEMINAR_PORT="${SEMINAR_PORT:-8765}"
+export SEMINAR_SITE="$PWD/site/dist"
 cloudflared="$(command -v cloudflared || echo server/.bin/cloudflared)"
+
+(cd site && pnpm build >/dev/null)
 log="$(mktemp)"
 
 uv run server/proxy.py >/dev/null &
@@ -31,7 +35,11 @@ if [ -z "$url" ]; then
   exit 1
 fi
 
-echo "Live demo is reachable. Add this to the end of the site's address:"
+echo "Open this on any machine (site and live demo):"
+echo
+echo "$url/#live=wss://${url#https://}/ws&token=$SEMINAR_TOKEN"
+echo
+echo "If the site is hosted elsewhere, add only this to its address:"
 echo
 echo "#live=wss://${url#https://}/ws&token=$SEMINAR_TOKEN"
 echo

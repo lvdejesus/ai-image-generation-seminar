@@ -11,6 +11,9 @@ receives the model's real state at the start and after each of the 8 turbo
 steps as JPEG frames.
 ComfyUI itself is never exposed: the only thing a client controls is the
 prompt text, which is placed into one fixed workflow.
+
+With SEMINAR_SITE set to a built copy of the site (site/dist), the proxy
+also serves it, so one address gives both the site and the live demo.
 """
 
 import asyncio
@@ -144,8 +147,21 @@ async def health(_request):
     return web.Response(text="ok")
 
 
+def serve_site(app, folder):
+    """Serve the built site from `folder` at the root of this server."""
+
+    async def index(_request):
+        return web.FileResponse(folder / "index.html")
+
+    app.router.add_get("/", index)
+    app.router.add_static("/", folder)
+
+
 if __name__ == "__main__":
     app = web.Application()
     app.add_routes([web.get("/ws", socket), web.get("/health", health)])
+    site = os.environ.get("SEMINAR_SITE")
+    if site and (pathlib.Path(site) / "index.html").exists():
+        serve_site(app, pathlib.Path(site).resolve())
     print(f"token: {TOKEN}", flush=True)
     web.run_app(app, host="127.0.0.1", port=PORT, print=lambda *_: None)

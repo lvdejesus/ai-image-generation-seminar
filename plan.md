@@ -12,14 +12,14 @@ The talk never depends on the live part: every visual, including the Section V d
 
 ```
 cd site && pnpm dev                              # the site, on http://localhost:5173
-./server/live.sh                                 # the live proxy plus a public tunnel to it
+./server/live.sh                                 # builds the site, serves it with the live proxy, and opens a public tunnel
 SEMINAR_TOKEN=<secret> uv run server/proxy.py    # the live proxy alone, on localhost:8765
 python3 tools/assets.py [group]                  # regenerate recorded images
 python3 tools/photos.py                          # re-download the photographs for beat 2
 cd site && pnpm thumbs                           # re-capture the overview thumbnails (dev server running)
 ```
 
-- `server/live.sh` prints a fragment such as `#live=wss://<random>.trycloudflare.com/ws&token=<secret>`. Add it to the end of the site's address to use the live demo; without it, the demo plays its recording.
+- `server/live.sh` prints one address, `https://<random>.trycloudflare.com/#live=…&token=…`, that works on any machine: the proxy serves the built site as well as the live demo. It also prints the fragment alone, for when the site is hosted elsewhere. Without the fragment the demo plays its recording.
 - For the proxy alone, the fragment is `#live=ws://localhost:8765/ws&token=<secret>`.
 - The proxy and the asset script need ComfyUI running on port 8188.
 - `pnpm build` writes the static site to `site/dist`.
