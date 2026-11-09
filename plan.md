@@ -146,7 +146,7 @@ What is still illustrative: the training example in beats 5 to 7 and 16 is a cle
 
 ## Not done yet
 
-1. **Publishing to GitHub Pages**, on hold by request. `gh` is logged in with the needed scopes; there is no repository yet, and it will be public.
+1. **Publishing to GitHub Pages:** published at https://lvdejesus.github.io/ai-image-generation-seminar/ from the public repository https://github.com/lvdejesus/ai-image-generation-seminar.
 2. **Rehearsal.** A timed run from a second device on another network, and a try with a real trackpad and clicker: the scroll sensitivity constants are at the top of `site/src/engine.ts`.
 
 ## Before the talk
