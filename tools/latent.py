@@ -6,7 +6,9 @@ Run with ComfyUI's own Python, since it needs ComfyUI's VAE code:
 
 It encodes the lighthouse image with the model's VAE on the CPU and writes
 site/public/assets/latent.png: a 4x4 grid of the 64x64 channels, each scaled
-to use the full range of grey.
+to use the full range of grey. It also decodes that latent back into an image
+and writes site/public/assets/decoded.png, losslessly, so the only difference
+from the original is the one the VAE makes.
 """
 
 import pathlib
@@ -44,3 +46,8 @@ for c in range(channels):
     grid[row * size:(row + 1) * size, column * size:(column + 1) * size] = (tile * 255).astype(np.uint8)
 Image.fromarray(grid).save(ASSETS / "latent.png")
 print("wrote", (ASSETS / "latent.png").relative_to(ROOT))
+
+with torch.no_grad():
+    decoded = vae.decode(torch.from_numpy(latent)[None, :, None]).squeeze().float().clamp(0, 1).cpu().numpy()
+Image.fromarray((decoded.reshape(512, 512, 3) * 255).round().astype(np.uint8)).save(ASSETS / "decoded.png")
+print("wrote", (ASSETS / "decoded.png").relative_to(ROOT))

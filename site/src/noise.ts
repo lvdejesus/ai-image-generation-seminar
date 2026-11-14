@@ -103,44 +103,67 @@ export class NoisyImage {
 }
 
 /**
- * A picture of noise itself. `mix` blends between two noise samples, from
- * the first (0) to the second (1), so a wrong prediction can settle into
- * the true noise. With `difference` set, the picture shows how far the
- * blend is from the first sample instead: bright where they differ, black
- * where they agree.
+ * The model's guess of the clean image, during training. `wrong` blends
+ * from a soft copy of the image (0) to unrelated noise (1): an untrained
+ * model guesses nonsense, and a trained one guesses a soft version of the
+ * original, since from heavy noise the details cannot be known. `frame`
+ * picks the image from the sequence. With `difference` set, the picture
+ * shows how far the guess is from the sharp original instead: bright where
+ * they differ, black where they agree.
  */
-export class NoiseField {
+export class Guess {
   readonly canvas = document.createElement('canvas')
-  mix = 0
+  wrong = 1
+  frame = 0
 
   private ctx: CanvasRenderingContext2D
-  private first: Float32Array
-  private second: Float32Array
+  private sharp: Float32Array[]
+  private soft: Float32Array[]
+  private noise: Float32Array
   private out: ImageData
-  private drawn = -1
+  private drawn = ''
 
-  constructor(size: number, seed: number, otherSeed: number, private difference = false) {
+  constructor(sources: CanvasImageSource[], size: number, seed: number, private difference = false) {
     this.canvas.width = this.canvas.height = size
-    this.ctx = this.canvas.getContext('2d')!
-    this.first = gaussian(size * size * 3, seed)
-    this.second = gaussian(size * size * 3, otherSeed)
+    this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })!
+    // Drawn small and scaled back up, the image loses its fine detail.
+    const small = document.createElement('canvas')
+    small.width = small.height = Math.round(size / 10)
+    const smallCtx = small.getContext('2d')!
+    this.soft = sources.map((source) => {
+      smallCtx.drawImage(source, 0, 0, small.width, small.height)
+      return toFloats(this.ctx, small, size)
+    })
+    this.sharp = sources.map((source) => toFloats(this.ctx, source, size))
+    this.noise = gaussian(size * size * 3, seed)
     this.out = this.ctx.createImageData(size, size)
     this.out.data.fill(255)
     this.render()
   }
 
   render = () => {
-    if (this.mix === this.drawn) return
-    this.drawn = this.mix
-    const a = Math.cos((this.mix * Math.PI) / 2)
-    const b = Math.sin((this.mix * Math.PI) / 2)
-    const { first, second } = this
+    const key = `${this.wrong}|${this.frame}`
+    if (key === this.drawn) return
+    this.drawn = key
+
+    const last = this.sharp.length - 1
+    const position = Math.max(0, Math.min(last, this.frame))
+    const k = Math.floor(position)
+    const next = Math.min(last, k + 1)
+    const blend = position - k
+    const { noise, wrong } = this
     const data = this.out.data
-    for (let i = 0, j = 0; j < first.length; i += 4, j += 3) {
+    for (let i = 0, j = 0; j < noise.length; i += 4, j += 3) {
       for (let c = 0; c < 3; c++) {
-        const value = a * first[j + c] + b * second[j + c]
-        // The difference is brightened a little, so a small one still shows.
-        data[i + c] = this.difference ? Math.abs(value - first[j + c]) * 190 : value * 127.5 + 127.5
+        const soft = this.soft[k][j + c] + (this.soft[next][j + c] - this.soft[k][j + c]) * blend
+        const guess = (1 - wrong) * soft + wrong * 0.6 * noise[j + c]
+        if (this.difference) {
+          const sharp = this.sharp[k][j + c] + (this.sharp[next][j + c] - this.sharp[k][j + c]) * blend
+          // The difference is brightened a little, so a small one still shows.
+          data[i + c] = Math.abs(guess - sharp) * 190
+        } else {
+          data[i + c] = guess * 127.5 + 127.5
+        }
       }
     }
     this.ctx.putImageData(this.out, 0, 0)
@@ -166,84 +189,6 @@ export class Static {
     const data = this.out.data
     for (let i = 0; i < data.length; i += 4) {
       data[i] = data[i + 1] = data[i + 2] = Math.random() * 210
-    }
-    this.ctx.putImageData(this.out, 0, 0)
-  }
-}
-
-/**
- * Static that resolves into a word. `reveal` runs from 0 (all static) to
- * 1 (the word). The static is made of `block`-sized cells, and each cell
- * settles at its own random moment into the crisp word underneath.
- */
-export class WordStatic {
-  readonly canvas = document.createElement('canvas')
-  reveal = 0
-
-  private ctx: CanvasRenderingContext2D
-  private out: ImageData
-  private mask: Uint8ClampedArray
-  private settleAt: Float32Array
-  private columns: number
-  private rows: number
-  private finished = false
-
-  constructor(width: number, height: number, private block: number, text: string, font: string) {
-    this.canvas.width = width
-    this.canvas.height = height
-    this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })!
-
-    this.ctx.fillStyle = '#000'
-    this.ctx.fillRect(0, 0, width, height)
-    this.ctx.fillStyle = '#fff'
-    this.ctx.font = font
-    this.ctx.textAlign = 'center'
-    this.ctx.textBaseline = 'middle'
-    this.ctx.fillText(text, width / 2, height / 2)
-    const pixels = this.ctx.getImageData(0, 0, width, height).data
-    this.mask = new Uint8ClampedArray(width * height)
-    for (let p = 0; p < this.mask.length; p++) this.mask[p] = pixels[p * 4]
-
-    this.columns = Math.ceil(width / block)
-    this.rows = Math.ceil(height / block)
-    this.settleAt = new Float32Array(this.columns * this.rows)
-    const random = seeded(7)
-    for (let c = 0; c < this.settleAt.length; c++) this.settleAt[c] = random()
-
-    this.out = this.ctx.createImageData(width, height)
-    this.out.data.fill(255)
-    this.draw()
-  }
-
-  draw = () => {
-    // Once every cell has settled there is nothing left to flicker.
-    if (this.finished && this.reveal >= 1) return
-    this.finished = this.reveal >= 1
-
-    const { mask, settleAt, reveal, block, columns, rows } = this
-    const { width, height } = this.canvas
-    const data = this.out.data
-    for (let row = 0; row < rows; row++) {
-      for (let column = 0; column < columns; column++) {
-        const settled = settleAt[row * columns + column] < reveal
-        const grey = Math.random() * 210
-        const right = Math.min((column + 1) * block, width)
-        const bottom = Math.min((row + 1) * block, height)
-        for (let y = row * block; y < bottom; y++) {
-          for (let p = y * width + column * block; p < y * width + right; p++) {
-            const i = p * 4
-            if (settled) {
-              // Background (11, 12, 15) blended towards ink (243, 240, 233).
-              const m = mask[p] / 255
-              data[i] = 11 + 232 * m
-              data[i + 1] = 12 + 228 * m
-              data[i + 2] = 15 + 218 * m
-            } else {
-              data[i] = data[i + 1] = data[i + 2] = grey
-            }
-          }
-        }
-      }
     }
     this.ctx.putImageData(this.out, 0, 0)
   }

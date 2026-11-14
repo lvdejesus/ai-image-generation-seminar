@@ -1,5 +1,6 @@
 // Small building blocks shared by the scenes.
 import gsap from 'gsap'
+import { ideas } from './beats'
 
 export type Timeline = gsap.core.Timeline
 
@@ -141,6 +142,26 @@ export function chip(parent: HTMLElement, text: string, cx: number, cy: number, 
   return node
 }
 
+/**
+ * The prompt of a recorded run, as an accent chip at the top right under the
+ * headline: the same place on every beat that shows a generation.
+ */
+export function promptChip(parent: HTMLElement, text: string) {
+  return chip(parent, text, 1560, 320, 'accent')
+}
+
+/**
+ * One of the talk's three ideas: its number in a ring, then its text. The
+ * node is `width` pixels wide with its left edge at x; add 'centered' to
+ * centre the content in that width.
+ */
+export function idea(parent: HTMLElement, n: number, x: number, y: number, className = '', width = 900) {
+  const node = place(el('div', `idea ${className}`), x, y, width)
+  node.append(el('span', 'num', String(n)), el('span', '', ideas[n - 1]))
+  parent.append(node)
+  return node
+}
+
 /** Fade and lift a set of nodes in. */
 export function rise(tl: Timeline, nodes: gsap.TweenTarget, at: number, stagger = 0) {
   tl.fromTo(nodes, { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out', stagger }, at)
@@ -172,7 +193,7 @@ gsap.ticker.add((time) => {
 
 // ----------------------------------------------------------------- assets
 
-const THREE = ['cat', 'girl', 'lighthouse'] as const
+const THREE = ['cat', 'girl', 'lighthouse', 'none'] as const
 /** Photographs that have a cut-out. */
 const CUTS = [0, 6, 8]
 export type Subject = (typeof THREE)[number]
@@ -183,6 +204,8 @@ export const assets = {} as {
   portrait: HTMLImageElement
   /** Real photographs standing for "existing images". See tools/photos.py. */
   found: HTMLImageElement[]
+  /** Everyday photographs for the collection of training images. See tools/photos.py. */
+  collection: HTMLImageElement[]
   /** Subjects cut out of some of those photographs, by index into `found`. */
   cut: Record<number, HTMLImageElement>
   /** The portrait as the model sees it at five noise levels, least noisy first. */
@@ -193,18 +216,22 @@ export const assets = {} as {
   cand: HTMLImageElement[]
   /** The model's single-step guess from that same input. */
   guess: HTMLImageElement
+  /** The model's guess of the clean image at step 1, from pure noise: with no text, and with the portrait prompt. */
+  hedge: { none: HTMLImageElement; portrait: HTMLImageElement }
   /** The model's states along the way from that input to cand[0]. */
   back: HTMLImageElement[]
   /** The portrait from much more noise, taken back by the anime model and by a photo-trained one. */
   far: { anime: HTMLImageElement; photo: HTMLImageElement }
   /** A text-to-image run: the real state at the start and after each of 30 steps. */
   run: HTMLImageElement[]
-  /** One starting noise, three prompts: the noise, five states along the way, the result. */
+  /** One starting noise, three prompts and no prompt: the noise, five states along the way, the result. */
   three: Record<Subject, HTMLImageElement[]>
   /** The live demo's 8-step workflow, recorded: the noise, then the state after each step. */
   fallback: HTMLImageElement[]
   /** The real latent of the lighthouse image: its 16 channels as a 4x4 grid. */
   latent: HTMLImageElement
+  /** The lighthouse image compressed to that latent and decompressed again, saved losslessly. */
+  decoded: HTMLImageElement
 }
 
 async function image(path: string) {
@@ -217,9 +244,10 @@ async function image(path: string) {
 const series = (count: number, path: (i: number) => string) => Promise.all(Array.from({ length: count }, (_, i) => image(path(i))))
 
 export async function loadAssets() {
-  const [portrait, found, cuts, noised, near, cand, guess, back, anime, photo, run, fallback, latent, ...three] = await Promise.all([
+  const [portrait, found, collection, cuts, noised, near, cand, guess, back, anime, photo, run, fallback, latent, decoded, hedgeNone, hedgePortrait, ...three] = await Promise.all([
     image('portrait.jpg'),
     series(10, (i) => `found/${i}.webp`),
+    series(19, (i) => `collection/${i}.webp`),
     Promise.all(CUTS.map((k) => image(`cut/${k}.webp`))),
     series(5, (i) => `noised/${i}.webp`),
     image('near.webp'),
@@ -231,9 +259,12 @@ export async function loadAssets() {
     series(31, (i) => `run/${String(i).padStart(2, '0')}.webp`),
     series(9, (i) => `fallback/${i}.webp`),
     image('latent.png'),
+    image('decoded.png'),
+    image('hedge/none.webp'),
+    image('hedge/portrait.webp'),
     ...THREE.map((name) => series(7, (i) => `three/${name}/${i}.webp`)),
   ])
-  Object.assign(assets, { portrait, found, noised, near, cand, guess, back, run, fallback, latent, far: { anime, photo } })
+  Object.assign(assets, { portrait, found, collection, noised, near, cand, guess, back, run, fallback, latent, decoded, far: { anime, photo }, hedge: { none: hedgeNone, portrait: hedgePortrait } })
   assets.cut = Object.fromEntries(CUTS.map((k, i) => [k, cuts[i]]))
   assets.three = Object.fromEntries(THREE.map((name, i) => [name, three[i]])) as Record<Subject, HTMLImageElement[]>
 }

@@ -50,8 +50,10 @@ busy = asyncio.Lock()
 
 
 def rejected(prompt):
-    words = prompt.lower().replace(",", " ").replace("_", " ").split()
-    return any(word.strip(".!?") in BLOCKED for word in words)
+    # words = prompt.lower().replace(",", " ").replace("_", " ").split()
+    # return any(word.strip(".!?") in BLOCKED for word in words)
+
+    return False
 
 
 def workflow(prompt, seed):

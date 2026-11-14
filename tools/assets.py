@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 
-from comfy import QUALITY, Graph, anima, conditioning, preview, request, rollout, run, sample, sigma, true_state, upload_image
+from comfy import NEGATIVE, QUALITY, Graph, anima, conditioning, preview, request, rollout, run, sample, sigma, true_state, upload_image
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "site" / "public" / "assets"
@@ -21,11 +21,13 @@ SIZE = 512
 STEPS = 30
 CFG = 4.0
 
-# The portrait rollouts use no prompt at all: Section II of the talk has
-# not introduced text yet. (The negative prompt stays, and it matters: with
-# only the quality tags as prompt, the same rollouts drift to unpresentable
-# images.)
-PORTRAIT_PROMPT = ""
+# The portrait rollouts use a plain prompt with no quality tags: the caption
+# is an input from beat 10, and the site shows this prompt with each run.
+# (The negative prompt stays, and it matters: with only the quality tags as
+# prompt, the same rollouts drift to unpresentable images.) The prompt keeps
+# the results realistic in beat 11, so the anime model's style only shows
+# in beat 18.
+PORTRAIT_PROMPT = "a man in a suit and tie, smiling"
 # Steps of the 30-step schedule (0 is pure noise, 30 is clean) at which the
 # noised portrait is recorded for the strip, least noisy first.
 NOISED_AT = [26, 21, 16, 10, 3]
@@ -38,7 +40,7 @@ BACK_AT = [18, 20, 22, 24, 27]
 # comparison: from here the anime model returns anime characters.
 FAR = 10
 NOISE_SEED = 7
-CANDIDATE_SEEDS = [11, 22, 33, 44]
+CANDIDATE_SEEDS = [11, 22, 33, 44, 55, 66, 77, 88, 99, 110, 121, 132]
 # Steps at which the three-prompt runs are recorded.
 THREE_AT = [10, 16, 20, 23, 26]
 
@@ -47,7 +49,13 @@ THREE_PROMPTS = {
     "lighthouse": f"{QUALITY}, no humans, scenery, a lighthouse on a cliff at sunset, ocean, orange sky, clouds",
     "cat": f"{QUALITY}, no humans, a fluffy white cat sitting on a windowsill, potted plant, sunlight",
     "girl": f"{QUALITY}, 1girl, long black hair, red scarf, winter coat, snow, looking at viewer, upper body, smile",
+    # The same noise with no text at all, for the slide before the three
+    # prompts: an empty prompt and, in three(), an empty negative, so nothing
+    # steers the run. (The quality tags alone give an unpresentable image here.)
+    "none": "",
 }
+# The seed of the step-1 guesses from pure noise in beat 15.
+HEDGE_SEED = 99
 FALLBACK_PROMPT = f"{QUALITY}, no humans, a cat wearing a wizard hat, reading a book, library, candlelight"
 
 
@@ -148,8 +156,27 @@ def three():
     model, clip, vae = anima(g)
     outputs = {}
     for name, prompt in THREE_PROMPTS.items():
-        positive, negative = conditioning(g, clip, prompt)
+        positive, negative = conditioning(g, clip, prompt, negative=NEGATIVE if prompt else "")
         rollout(g, model, positive, negative, vae, record(g, vae, outputs, lambda i, name=name: f"three/{name}/{i}.webp"), seed=99, steps=STEPS, cfg=CFG, stops=THREE_AT)
+    execute(g, outputs)
+
+
+def hedge():
+    """The model's guess of the clean image at step 1, from pure noise: with no text, and with a caption.
+
+    At full noise the hint tells the model almost nothing, so this is its safe
+    answer to the caption alone: grey with no text, and with the portrait
+    prompt the shared parts of all such pictures, a ghostly man in a dark
+    suit. One step with no leftover noise jumps to noise level 0, which is
+    the guess.
+    """
+    g = Graph()
+    model, clip, vae = anima(g)
+    outputs = {}
+    for name, prompt in {"none": "", "portrait": PORTRAIT_PROMPT}.items():
+        positive, negative = conditioning(g, clip, prompt, negative=NEGATIVE if prompt else "")
+        latent = g.out(g.add("EmptyHunyuanLatentVideo", width=SIZE, height=SIZE, length=1, batch_size=1))
+        outputs[f"hedge/{name}.webp"] = preview(g, vae, sample(g, model, positive, negative, latent, seed=HEDGE_SEED, steps=STEPS, cfg=CFG, start=0, end=1))
     execute(g, outputs)
 
 
@@ -219,7 +246,7 @@ def cutouts():
         print("wrote", path.relative_to(ROOT))
 
 
-GROUPS = {"portrait": portrait, "run": denoise_run, "three": three, "fallback": fallback, "photo": photo, "cutouts": cutouts}
+GROUPS = {"portrait": portrait, "run": denoise_run, "three": three, "hedge": hedge, "fallback": fallback, "photo": photo, "cutouts": cutouts}
 
 if __name__ == "__main__":
     for group in sys.argv[1:] or GROUPS:

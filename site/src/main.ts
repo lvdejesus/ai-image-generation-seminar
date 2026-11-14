@@ -12,6 +12,7 @@ import { noising } from './scenes/noising'
 import { demo, pipeline } from './scenes/pipeline'
 import { prompt } from './scenes/prompt'
 import { reverse } from './scenes/reverse'
+import { spine } from './scenes/spine'
 import { training } from './scenes/training'
 
 const STAGE_W = 1920
@@ -25,7 +26,8 @@ const tip = document.querySelector<HTMLElement>('#tip')!
 const setup = document.querySelector<HTMLElement>('#setup')!
 
 // Scenes in order. A scene covers one or more consecutive beats.
-const builders: SceneBuilder[] = [intro, noising, training, reverse, generate, prompt, latent, pipeline]
+// spine(n) is step n of the diagram that grows through the talk.
+const builders: SceneBuilder[] = [intro, noising, training, reverse, generate, spine(1), prompt, spine(2), latent, spine(3), pipeline]
 
 // starts[i] is the time at which beat i should begin if the talk is on budget.
 const starts = beats.map((_, i) => beats.slice(0, i).reduce((sum, b) => sum + b.seconds, 0))

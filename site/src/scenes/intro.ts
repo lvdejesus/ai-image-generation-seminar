@@ -1,15 +1,22 @@
-// Section I, beats 1-3: the question, the misconception, and the answer.
+// Section I, beats 1-4: the question, the misconception, the answer shown on
+// the prompt from beat 1, and the three ideas the talk explains it with.
 import gsap from 'gsap'
-import { arrow, assets, draw, el, headline, live, overlay, place, stroke, wordsIn, wordsOut } from '../kit'
+import { arrow, assets, chip, draw, el, headline, idea, live, overlay, place, rise, shot, stroke, wordsIn, wordsOut } from '../kit'
 import { title } from '../beats'
-import { Static, WordStatic } from '../noise'
+import { NoisyImage, Static } from '../noise'
 
-const PROMPT = 'a lighthouse on a cliff at sunset'
+/** The prompt typed in beat 1; the lighthouse runs in this talk use it. */
+export const LIGHTHOUSE_PROMPT = 'a lighthouse on a cliff at sunset'
 
 // Geometry on the 1920x1080 stage.
 const BOX = { x: 104, y: 470, w: 760, h: 88 }
 const FRAME = { x: 1216, y: 214, size: 600 }
 const TILE = { x: 104, y: 648, size: 136, pitch: 156, columns: 5 }
+// Beat 3: the lighthouse run, centred under the headline. Beat 4 moves it to
+// the left, with the three ideas on its right.
+const RUN = { x: 960, y: 650, size: 480 }
+const ASIDE = { x: 500, scale: 0.85 }
+const IDEAS = { x: 860, y: 470, pitch: 130 }
 
 /** One of the real photographs, as a square canvas. */
 function thumbnail(size: number, k: number) {
@@ -56,6 +63,7 @@ export function intro(root: HTMLElement) {
   const question = headline(root, title('1'), 1040)
   const misconception = headline(root, title('2'), 1040)
   const answer = headline(root, title('3'), 1500)
+  const three = headline(root, title('4'), 1500)
   const lines = overlay(root)
 
   // Prompt box, with the prompt typed into it.
@@ -115,11 +123,12 @@ export function intro(root: HTMLElement) {
   ]
   root.append(lines) // keep the strokes above the pieces
 
-  // The word that resolves out of static.
-  const word = new WordStatic(1712, 440, 4, 'denoising', '700 288px "Space Grotesk Variable"')
-  live(word.canvas, word.draw)
-  place(word.canvas, 104, 440, 1712, 440)
-  root.append(word.canvas)
+  // The run for the prompt from beat 1: its real starting noise, the real
+  // states along the way, and the result.
+  const run = new NoisyImage(assets.three.lighthouse, 384, 1)
+  const runFrame = shot(root, run.canvas, RUN.x, RUN.y, RUN.size)
+  const runChip = chip(root, LIGHTHOUSE_PROMPT, RUN.x, RUN.y + RUN.size / 2 + 44, 'accent')
+  const ideaLines = [1, 2, 3].map((n) => idea(root, n, IDEAS.x, IDEAS.y + (n - 1) * IDEAS.pitch, 'large'))
 
   // ---- Beat 1: the question, then a prompt going in and a mystery coming out.
   const typed = { n: 0 }
@@ -128,7 +137,7 @@ export function intro(root: HTMLElement) {
   beat1
     .fromTo(boxTag, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 0.55)
     .fromTo(box, { scaleX: 0, transformOrigin: '0 50%' }, { scaleX: 1, duration: 0.6, ease: 'power4.out' }, 0.55)
-    .to(typed, { n: PROMPT.length, duration: 1.2, ease: 'none', onUpdate: () => (typedText.textContent = PROMPT.slice(0, Math.round(typed.n))) }, 1.0)
+    .to(typed, { n: LIGHTHOUSE_PROMPT.length, duration: 1.2, ease: 'none', onUpdate: () => (typedText.textContent = LIGHTHOUSE_PROMPT.slice(0, Math.round(typed.n))) }, 1.0)
   draw(beat1, toFrame, 2.2, 0.45)
   beat1
     .fromTo(frame, { clipPath: 'inset(0% 100% 0% 0% round 24px)' }, { clipPath: 'inset(0% 0% 0% 0% round 24px)', duration: 0.7, ease: 'power3.inOut' }, 2.5)
@@ -153,8 +162,7 @@ export function intro(root: HTMLElement) {
   draw(beat2, cross[0], 4.05, 0.3)
   draw(beat2, cross[1], 4.25, 0.3)
 
-  // ---- Beat 3: everything clears; static resolves into the word.
-  const reveal = { value: 0 }
+  // ---- Beat 3: everything clears; the static from beat 1 becomes the lighthouse.
   const beat3 = gsap.timeline()
   wordsOut(beat3, misconception, 0)
   wordsIn(beat3, answer, 0.4)
@@ -162,8 +170,19 @@ export function intro(root: HTMLElement) {
     .to([...tiles].reverse(), { y: 50, autoAlpha: 0, duration: 0.35, ease: 'power2.in', stagger: 0.025 }, 0)
     .to([tilesTag, boxTag, box, toFrame, ...cross, ...pieces], { autoAlpha: 0, duration: 0.35 }, 0.1)
     .to(frame, { autoAlpha: 0, duration: 0.35 }, 0.1)
-    .fromTo(word.canvas, { clipPath: 'inset(0% 100% 0% 0%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.8, ease: 'power3.inOut' }, 0.6)
-    .to(reveal, { value: 1, duration: 2, ease: 'power1.inOut', onUpdate: () => ((word.reveal = reveal.value), word.draw()) }, 1.5)
+    .fromTo(runFrame, { clipPath: 'inset(50% 50% 50% 50% round 14px)' }, { clipPath: 'inset(0% 0% 0% 0% round 14px)', duration: 0.8, ease: 'power3.inOut' }, 0.6)
+  rise(beat3, runChip, 0.9)
+  beat3.to(run, { frame: assets.three.lighthouse.length - 1, duration: 3, ease: 'power1.inOut', onUpdate: run.render }, 1.5)
 
-  return [beat1, beat2, beat3]
+  // ---- Beat 4: the lighthouse moves aside for the three ideas.
+  const beat4 = gsap.timeline()
+  wordsOut(beat4, answer, 0)
+  wordsIn(beat4, three, 0.4)
+  const shift = ASIDE.x - RUN.x
+  beat4
+    .to(runFrame, { x: shift, scale: ASIDE.scale, duration: 0.8, ease: 'power3.inOut' }, 0.3)
+    .to(runChip, { x: shift, y: (-RUN.size / 2) * (1 - ASIDE.scale), duration: 0.8, ease: 'power3.inOut' }, 0.3)
+  rise(beat4, ideaLines, 1.0, 0.6)
+
+  return [beat1, beat2, beat3, beat4]
 }
