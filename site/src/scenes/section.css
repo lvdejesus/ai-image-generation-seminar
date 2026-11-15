@@ -1,0 +1,15 @@
+/* Section pages (section.ts). */
+
+.section-page .section-numeral {
+  font-family: var(--mono);
+  font-size: 160px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.section-page .headline.section-title {
+  font-size: 112px;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+}

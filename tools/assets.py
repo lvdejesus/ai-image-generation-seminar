@@ -26,7 +26,7 @@ CFG = 4.0
 # (The negative prompt stays, and it matters: with only the quality tags as
 # prompt, the same rollouts drift to unpresentable images.) The prompt keeps
 # the results realistic in beat 11, so the anime model's style only shows
-# in beat 18.
+# in beat 22.
 PORTRAIT_PROMPT = "a man in a suit and tie, smiling"
 # Steps of the 30-step schedule (0 is pure noise, 30 is clean) at which the
 # noised portrait is recorded for the strip, least noisy first.
@@ -54,9 +54,21 @@ THREE_PROMPTS = {
     # steers the run. (The quality tags alone give an unpresentable image here.)
     "none": "",
 }
-# The seed of the step-1 guesses from pure noise in beat 15.
+# The seed of the step-1 guesses from pure noise in beat 16.
 HEDGE_SEED = 99
 FALLBACK_PROMPT = f"{QUALITY}, no humans, a cat wearing a wizard hat, reading a book, library, candlelight"
+# The car runs, for generating from pure noise and the colour wheel. The car
+# is in about the same place in every result, and its colour varies widely
+# from seed to seed, so the colour of one region shows how sure the model is.
+CAR_PROMPT = f"{QUALITY}, no humans, a sports car parked on a city street, daytime"
+CAR_SEED = 401
+# Seeds of the other results from pure noise (round one of the colour wheel).
+CAR_OTHERS = [402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412]
+# The step after which a red patch shows through the run's noise (the model
+# has settled on red well before the eye can see it), and the seeds of the
+# results that branch from that state (round two).
+CAR_STEP = 18
+CAR_BRANCHES = [501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512]
 
 
 def save(png, path):
@@ -164,7 +176,7 @@ def three():
 def hedge():
     """The model's guess of the clean image at step 1, from pure noise: with no text, and with a caption.
 
-    At full noise the hint tells the model almost nothing, so this is its safe
+    At full noise the noisy input tells the model almost nothing, so this is its safe
     answer to the caption alone: grey with no text, and with the portrait
     prompt the shared parts of all such pictures, a ghostly man in a dark
     suit. One step with no leftover noise jumps to noise level 0, which is
@@ -246,7 +258,87 @@ def cutouts():
         print("wrote", path.relative_to(ROOT))
 
 
-GROUPS = {"portrait": portrait, "run": denoise_run, "three": three, "hedge": hedge, "fallback": fallback, "photo": photo, "cutouts": cutouts}
+def car():
+    """The car: a full run from pure noise, and the results the colour wheel is made of.
+
+    car/run/: the real state at the start and after every step of one run.
+    car/far/: results from pure noise, the run's own and those of other seeds.
+    car/near/: results that branch from the run's state after CAR_STEP steps,
+    each finishing with its own fresh randomness (an ancestral sampler).
+    car/guess/: the model's guess of the clean image at the start and after CAR_STEP steps.
+    """
+    g = Graph()
+    model, clip, vae = anima(g)
+    positive, negative = conditioning(g, clip, CAR_PROMPT)
+    outputs = {}
+    rollout(g, model, positive, negative, vae, record(g, vae, outputs, lambda i: f"car/run/{i:02d}.webp"), seed=CAR_SEED, steps=STEPS, cfg=CFG, stops=range(1, STEPS))
+
+    def empty():
+        return g.out(g.add("EmptyHunyuanLatentVideo", width=SIZE, height=SIZE, length=1, batch_size=1))
+
+    for i, seed in enumerate([CAR_SEED, *CAR_OTHERS]):
+        outputs[f"car/far/{i}.webp"] = preview(g, vae, sample(g, model, positive, negative, empty(), seed=seed, steps=STEPS, cfg=CFG))
+    outputs["car/guess/0.webp"] = preview(g, vae, sample(g, model, positive, negative, empty(), seed=CAR_SEED, steps=STEPS, cfg=CFG, start=0, end=1))
+
+    state = sample(g, model, positive, negative, empty(), seed=CAR_SEED, steps=STEPS, cfg=CFG, start=0, end=CAR_STEP, leftover=True)
+    outputs["car/guess/1.webp"] = preview(g, vae, sample(g, model, positive, negative, state, seed=CAR_SEED, steps=STEPS, cfg=CFG, start=CAR_STEP, end=CAR_STEP + 1, add_noise=False))
+    for i, seed in enumerate(CAR_BRANCHES):
+        result = sample(g, model, positive, negative, state, seed=seed, steps=STEPS, cfg=CFG, start=CAR_STEP, add_noise=False, sampler="euler_ancestral")
+        outputs[f"car/near/{i}.webp"] = preview(g, vae, result)
+    execute(g, outputs)
+
+
+
+def car_predictions():
+    """The model's prediction of the clean image at every step of the car run.
+
+    car/pred/NN.webp is the prediction from the run's state after NN steps: one
+    step from there with no leftover noise jumps to noise level 0. The last
+    one (29) is the run's result. They go from a muddy blur to the red car.
+    """
+    g = Graph()
+    model, clip, vae = anima(g)
+    positive, negative = conditioning(g, clip, CAR_PROMPT)
+    outputs = {}
+    latent = g.out(g.add("EmptyHunyuanLatentVideo", width=SIZE, height=SIZE, length=1, batch_size=1))
+    for k in range(STEPS):
+        if k > 0:
+            latent = sample(g, model, positive, negative, latent, seed=CAR_SEED, steps=STEPS, cfg=CFG, start=k - 1, end=k, add_noise=(k == 1), leftover=True)
+        prediction = sample(g, model, positive, negative, latent, seed=CAR_SEED, steps=STEPS, cfg=CFG, start=k, end=k + 1, add_noise=(k == 0))
+        outputs[f"car/pred/{k:02d}.webp"] = preview(g, vae, prediction)
+    execute(g, outputs)
+
+
+def second():
+    """The second portrait with the same caption, for the slides on one caption and many images.
+
+    Both portraits at full noise (two different noises), and the second one
+    at the lightest level of NOISED_AT with the model's prediction from there.
+    The first portrait's light-noise state and prediction come from portrait().
+    """
+    g = Graph()
+    model, clip, vae = anima(g)
+    positive, negative = conditioning(g, clip, PORTRAIT_PROMPT)
+    schedule = g.out(g.add("BasicScheduler", model=model, scheduler="simple", steps=STEPS, denoise=1.0))
+    outputs = {}
+    for i, (photo, seed) in enumerate([("portrait.jpg", NOISE_SEED), ("portrait2.jpg", NOISE_SEED + 1)]):
+        name = upload_image(ASSETS / photo, f"seminar_{photo}")
+        image = g.out(g.add("LoadImage", image=name))
+        image = g.out(g.add("ImageScale", image=image, upscale_method="lanczos", width=SIZE, height=SIZE, crop="disabled"))
+        source = g.out(g.add("VAEEncode", pixels=image, vae=vae))
+        noise = g.out(g.add("RandomNoise", noise_seed=seed))
+        full = g.out(g.add("AddNoise", model=model, noise=noise, sigmas=schedule, latent_image=source))
+        outputs[f"second/full{i}.webp"] = preview(g, vae, full)
+        # The prediction from that full noise: one step with no leftover noise.
+        outputs[f"second/ghost{i}.webp"] = preview(g, vae, sample(g, model, positive, negative, source, seed=seed, steps=STEPS, cfg=CFG, start=0, end=1))
+        if i == 1:
+            rest = g.out(g.add("SplitSigmas", sigmas=schedule, step=NOISED_AT[0]), 1)
+            outputs["second/noised.webp"] = preview(g, vae, g.out(g.add("AddNoise", model=model, noise=noise, sigmas=rest, latent_image=source)))
+            outputs["second/near.webp"] = preview(g, vae, sample(g, model, positive, negative, source, seed=seed, steps=STEPS, cfg=CFG, start=NOISED_AT[0], end=None))
+    execute(g, outputs)
+
+
+GROUPS = {"car": car, "second": second, "car_predictions": car_predictions, "portrait": portrait, "run": denoise_run, "three": three, "hedge": hedge, "fallback": fallback, "photo": photo, "cutouts": cutouts}
 
 if __name__ == "__main__":
     for group in sys.argv[1:] or GROUPS:

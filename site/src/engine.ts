@@ -4,9 +4,13 @@
 // are the rest points: at position k, beat k - 1 is fully built. Scrolling
 // moves the playhead freely inside a span, and when the gesture ends the
 // playhead plays on to a rest point, so the deck is stepped underneath.
+//
+// A beat can also stop inside its span: a scene marks a hold with `hold(tl)`
+// from the kit, and the deck rests there until the next key press. The
+// overview and the hash still jump by whole beats.
 import gsap from 'gsap'
-import { beats, sections } from './beats'
-import { el, type Timeline } from './kit'
+import { beats, isSectionPage, sections } from './beats'
+import { el, HOLD, type Timeline } from './kit'
 
 /** Builds a scene's DOM under `root` and returns one timeline per beat it covers, authored in seconds. */
 export type SceneBuilder = (root: HTMLElement) => Timeline[]
@@ -36,6 +40,8 @@ export function createDeck({ scenes, labels, builders, onBeat, onSettle }: Optio
   const master = gsap.timeline({ paused: true })
   /** Authored duration of each beat, in seconds. */
   const natural: number[] = []
+  /** Every rest point, in master positions, sorted: the beat ends and the holds inside beats. */
+  const stops: number[] = []
 
   // One label per section, swapped when the section changes.
   const sectionLabels = new Map<string, HTMLElement>()
@@ -63,12 +69,25 @@ export function createDeck({ scenes, labels, builders, onBeat, onSettle }: Optio
         wrap.set(root, { autoAlpha: 1 }, 0.3)
         at = 0.3
       }
-      if (i > 0 && beats[i].section !== beats[i - 1].section) {
-        wrap.to(sectionLabels.get(beats[i - 1].section)!, { autoAlpha: 0, y: -24, duration: 0.3, ease: 'power2.in' }, 0)
-        wrap.to(sectionLabels.get(beats[i].section)!, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.3)
+      // The corner label leaves when the section changes. A section page
+      // shows the section large, so the new label comes in on the beat after it.
+      // The title page has no section, so it has no label.
+      if (i > 0) {
+        const before = beats[i - 1]
+        const now = beats[i]
+        const out = sectionLabels.get(before.section)
+        const into = sectionLabels.get(now.section)
+        if (out && now.section !== before.section && !isSectionPage(before)) wrap.to(out, { autoAlpha: 0, y: -24, duration: 0.3, ease: 'power2.in' }, 0)
+        if (into && !isSectionPage(now) && (now.section !== before.section || isSectionPage(before))) {
+          wrap.to(into, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.3)
+        }
       }
       wrap.add(timeline, at)
       natural[i] = wrap.duration()
+      for (const [name, t] of Object.entries(timeline.labels)) {
+        if (name.startsWith(HOLD)) stops.push(i + (at + t) / natural[i])
+      }
+      stops.push(i + 1)
       wrap.duration(1)
       master.add(wrap, i)
       i++
@@ -76,6 +95,14 @@ export function createDeck({ scenes, labels, builders, onBeat, onSettle }: Optio
     previousRoot = root
   }
   if (i !== count) throw new Error(`scenes cover ${i} beats, but there are ${count}`)
+  stops.sort((a, b) => a - b)
+
+  /** The first rest point after `pos`, or the last one. */
+  const stopAfter = (pos: number) => stops.find((s) => s > pos + EPS) ?? count
+  /** The last rest point before `pos`, or the first one. */
+  const stopBefore = (pos: number) => [...stops].reverse().find((s) => s < pos - EPS) ?? 1
+  /** The nearest rest point to `pos`. */
+  const stopNear = (pos: number) => stops.reduce((a, b) => (Math.abs(b - pos) < Math.abs(a - pos) ? b : a))
 
   // ------------------------------------------------------------ playhead
 
@@ -120,6 +147,8 @@ export function createDeck({ scenes, labels, builders, onBeat, onSettle }: Optio
       onComplete: () => {
         tween = null
         render()
+        // For tools that capture each step: the position the deck rests at.
+        document.documentElement.dataset.rest = String(state.pos)
         onSettle(index)
       },
     })
@@ -127,13 +156,13 @@ export function createDeck({ scenes, labels, builders, onBeat, onSettle }: Optio
 
   function next() {
     // Pressing again while a beat is still playing skips ahead, quickly.
-    if (tween && tweenDest > state.pos) playTo(tweenDest + 1, FAST)
-    else playTo(Math.floor(state.pos + EPS) + 1)
+    if (tween && tweenDest > state.pos) playTo(stopAfter(tweenDest), FAST)
+    else playTo(stopAfter(state.pos))
   }
 
   function prev() {
-    if (tween && tweenDest < state.pos) playTo(tweenDest - 1, FAST)
-    else playTo(Math.ceil(state.pos - EPS) - 1, FAST)
+    if (tween && tweenDest < state.pos) playTo(stopBefore(tweenDest), FAST)
+    else playTo(stopBefore(state.pos), FAST)
   }
 
   function jump(to: number) {
@@ -142,6 +171,7 @@ export function createDeck({ scenes, labels, builders, onBeat, onSettle }: Optio
     gesture = null
     state.pos = clamp(to + 1, 1, count)
     render()
+    document.documentElement.dataset.rest = String(state.pos)
     onSettle(index)
   }
 
@@ -154,13 +184,8 @@ export function createDeck({ scenes, labels, builders, onBeat, onSettle }: Optio
       tween = null
       const start = state.pos
       // A gesture can scrub at most to the neighbouring rest points, so
-      // trackpad momentum never carries past a beat.
-      gesture = {
-        start,
-        lo: Math.max(1, Math.ceil(start - EPS) - 1),
-        hi: Math.min(count, Math.floor(start + EPS) + 1),
-        target: start,
-      }
+      // trackpad momentum never carries past a hold.
+      gesture = { start, lo: stopBefore(start), hi: stopAfter(start), target: start }
     }
     gesture.target = clamp(gesture.target + pixels / WHEEL_PER_BEAT, gesture.lo, gesture.hi)
     window.clearTimeout(quiet)
@@ -172,9 +197,9 @@ export function createDeck({ scenes, labels, builders, onBeat, onSettle }: Optio
     const { start, target } = gesture
     gesture = null
     const travelled = target - start
-    if (travelled > COMMIT) playTo(Math.floor(start + EPS) + 1)
-    else if (travelled < -COMMIT) playTo(Math.ceil(start - EPS) - 1, FAST)
-    else playTo(Math.round(start), FAST)
+    if (travelled > COMMIT) playTo(stopAfter(start))
+    else if (travelled < -COMMIT) playTo(stopBefore(start), FAST)
+    else playTo(stopNear(start), FAST)
   }
 
   gsap.ticker.add((_time, deltaMs) => {

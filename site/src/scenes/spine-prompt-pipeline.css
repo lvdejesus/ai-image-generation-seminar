@@ -1,0 +1,8 @@
+/* Overrides for the spine, prompt and pipeline scenes only. */
+
+/* The prompt box in the diagram: a little more room for the prompt. */
+.spine-prompt-pipeline .prompt-box.small {
+  justify-content: center;
+  padding: 0 24px;
+}
+

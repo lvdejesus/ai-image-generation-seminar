@@ -48,6 +48,15 @@ export function headline(parent: HTMLElement, text: string, width = 1500): Headl
   return { el: h, words }
 }
 
+/** Label prefix that marks a hold: the deck stops there until the next key press. */
+export const HOLD = 'hold'
+let holds = 0
+
+/** Stop the deck at time `at` of this beat (default: the current end), until the next key press. */
+export function hold(tl: Timeline, at?: number) {
+  tl.addLabel(`${HOLD}-${holds++}`, at ?? tl.duration())
+}
+
 export function wordsIn(tl: Timeline, h: Headline, at: number) {
   tl.fromTo(h.words, { yPercent: 120 }, { yPercent: 0, duration: 0.8, ease: 'power4.out', stagger: 0.05 }, at)
 }
@@ -67,6 +76,24 @@ export function overlay(parent: HTMLElement) {
   svg.classList.add('overlay')
   parent.append(svg)
   return svg
+}
+
+/** A gear centred on (x, y), hidden, ready to turn about its centre. It shows that a model is training. */
+export function gear(svg: SVGSVGElement, x: number, y: number, outer = 40) {
+  const inner = outer * 0.775
+  const hole = outer * 0.3
+  const count = 10
+  const teeth = Array.from({ length: count * 4 }, (_, i) => {
+    const r = i % 4 < 2 ? outer : inner
+    const a = ((Math.floor(i / 2) + (i % 2) * 0.6) / (count * 2)) * Math.PI * 2
+    return `${(x + r * Math.cos(a)).toFixed(1)} ${(y + r * Math.sin(a)).toFixed(1)}`
+  })
+  const path = document.createElementNS(SVG_NS, 'path')
+  path.setAttribute('d', `M${teeth.join(' L')} Z M${x + hole} ${y} a${hole} ${hole} 0 1 0 ${-2 * hole} 0 a${hole} ${hole} 0 1 0 ${2 * hole} 0 Z`)
+  path.setAttribute('class', 'gear')
+  svg.append(path)
+  gsap.set(path, { svgOrigin: `${x} ${y}`, autoAlpha: 0 })
+  return path
 }
 
 /** A stroke that starts undrawn; reveal it with `draw`. */
@@ -143,11 +170,13 @@ export function chip(parent: HTMLElement, text: string, cx: number, cy: number, 
 }
 
 /**
- * The prompt of a recorded run, as an accent chip at the top right under the
- * headline: the same place on every beat that shows a generation.
+ * The prompt of a recorded run, as an accent chip under the headline, on the
+ * left margin: the same place on every beat that shows a generation.
  */
 export function promptChip(parent: HTMLElement, text: string) {
-  return chip(parent, text, 1560, 320, 'accent')
+  const node = chip(parent, text, 104, 310, 'accent')
+  gsap.set(node, { xPercent: 0 })
+  return node
 }
 
 /**
@@ -193,7 +222,7 @@ gsap.ticker.add((time) => {
 
 // ----------------------------------------------------------------- assets
 
-const THREE = ['cat', 'girl', 'lighthouse', 'none'] as const
+const THREE = ['cat', 'girl', 'lighthouse'] as const
 /** Photographs that have a cut-out. */
 const CUTS = [0, 6, 8]
 export type Subject = (typeof THREE)[number]
@@ -218,12 +247,18 @@ export const assets = {} as {
   guess: HTMLImageElement
   /** The model's guess of the clean image at step 1, from pure noise: with no text, and with the portrait prompt. */
   hedge: { none: HTMLImageElement; portrait: HTMLImageElement }
+  /** A second photo with the portrait's caption (tools/assets.py, second()): both photos at full noise, the model's prediction from each, and the second photo at 32% noise with the prediction from there. */
+  second: { photo: HTMLImageElement; full: HTMLImageElement[]; ghost: HTMLImageElement[]; noised: HTMLImageElement; near: HTMLImageElement }
+  /** More official portraits that fit the portrait's caption (tools/photos.py, same_caption()). */
+  sameCaption: HTMLImageElement[]
   /** The model's states along the way from that input to cand[0]. */
   back: HTMLImageElement[]
   /** The portrait from much more noise, taken back by the anime model and by a photo-trained one. */
   far: { anime: HTMLImageElement; photo: HTMLImageElement }
   /** A text-to-image run: the real state at the start and after each of 30 steps. */
   run: HTMLImageElement[]
+  /** The car (tools/assets.py, car()): a run's 31 states, results from pure noise, results that branch from the run after some steps, the model's prediction at both points, and its prediction after every step (pred: 0 to 29; 29 is the result). */
+  car: { run: HTMLImageElement[]; far: HTMLImageElement[]; near: HTMLImageElement[]; guess: HTMLImageElement[]; pred: HTMLImageElement[] }
   /** One starting noise, three prompts and no prompt: the noise, five states along the way, the result. */
   three: Record<Subject, HTMLImageElement[]>
   /** The live demo's 8-step workflow, recorded: the noise, then the state after each step. */
@@ -244,7 +279,7 @@ async function image(path: string) {
 const series = (count: number, path: (i: number) => string) => Promise.all(Array.from({ length: count }, (_, i) => image(path(i))))
 
 export async function loadAssets() {
-  const [portrait, found, collection, cuts, noised, near, cand, guess, back, anime, photo, run, fallback, latent, decoded, hedgeNone, hedgePortrait, ...three] = await Promise.all([
+  const [portrait, found, collection, cuts, noised, near, cand, guess, back, anime, photo, run, fallback, latent, decoded, hedgeNone, hedgePortrait, carRun, carFar, carNear, carGuess, carPred, photo2, full, ghost, noised2, near2, sameCaption, ...three] = await Promise.all([
     image('portrait.jpg'),
     series(10, (i) => `found/${i}.webp`),
     series(19, (i) => `collection/${i}.webp`),
@@ -262,9 +297,20 @@ export async function loadAssets() {
     image('decoded.png'),
     image('hedge/none.webp'),
     image('hedge/portrait.webp'),
+    series(31, (i) => `car/run/${String(i).padStart(2, '0')}.webp`),
+    series(12, (i) => `car/far/${i}.webp`),
+    series(12, (i) => `car/near/${i}.webp`),
+    series(2, (i) => `car/guess/${i}.webp`),
+    series(30, (i) => `car/pred/${String(i).padStart(2, '0')}.webp`),
+    image('portrait2.jpg'),
+    series(2, (i) => `second/full${i}.webp`),
+    series(2, (i) => `second/ghost${i}.webp`),
+    image('second/noised.webp'),
+    image('second/near.webp'),
+    series(5, (i) => `caption/${i}.webp`),
     ...THREE.map((name) => series(7, (i) => `three/${name}/${i}.webp`)),
   ])
-  Object.assign(assets, { portrait, found, collection, noised, near, cand, guess, back, run, fallback, latent, decoded, far: { anime, photo }, hedge: { none: hedgeNone, portrait: hedgePortrait } })
+  Object.assign(assets, { portrait, found, collection, noised, near, cand, guess, back, run, fallback, latent, decoded, far: { anime, photo }, hedge: { none: hedgeNone, portrait: hedgePortrait }, second: { photo: photo2, full, ghost, noised: noised2, near: near2 }, sameCaption, car: { run: carRun, far: carFar, near: carNear, guess: carGuess, pred: carPred } })
   assets.cut = Object.fromEntries(CUTS.map((k, i) => [k, cuts[i]]))
   assets.three = Object.fromEntries(THREE.map((name, i) => [name, three[i]])) as Record<Subject, HTMLImageElement[]>
 }

@@ -85,14 +85,66 @@ def main():
         "# Image credits",
         "",
         "- `portrait.jpg`: President Barack Obama, official portrait, 6 December 2012. Official White House Photo by Pete Souza. Public domain. https://commons.wikimedia.org/wiki/File:President_Barack_Obama.jpg",
+    ]
+    credits += [
+        portrait("File:Joe Biden presidential portrait.jpg", "portrait2.jpg",
+                 "President Joe Biden, official portrait, 2021. Official White House Photo by Adam Schultz."),
         "",
         "Photographs in `found/`, all from Wikimedia Commons:",
         "",
     ]
     credits += download(FILES, "found", 640)
+    credits += ["", "Photographs in `caption/`, more official portraits with the caption of portrait.jpg, all from Wikimedia Commons:", ""]
+    credits += same_caption()
     credits += ["", "Photographs in `collection/`, all from Wikimedia Commons:", ""]
     credits += download(COLLECTION, "collection", 360)
     (ASSETS / "CREDITS.md").write_text("\n".join(credits) + "\n")
+
+
+def portrait(title, name, caption):
+    """Download a second portrait with the same caption as portrait.jpg, cut square from the top; return its credit line."""
+    thumb, licence, author, page = describe(title)
+    if licence not in ALLOWED:
+        raise SystemExit(f"{title} is {licence!r}, not CC0 or public domain")
+    source = ASSETS / f"{name}.src"
+    source.write_bytes(fetch(thumb))
+    # Keep the head near the top, as in portrait.jpg.
+    crop = "crop=iw:iw:0:ih*0.05,scale=768:768"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-vf", crop, "-q:v", "2", str(ASSETS / name)], check=True)
+    source.unlink()
+    print("wrote", name, "|", licence)
+    return f"- `{name}`: {caption} {licence}. {page}"
+
+
+# More official portraits that fit the portrait caption ("a man in a suit and
+# tie, smiling"), for "The average minimizes the error" (II.B.8).
+CAPTION = [
+    "File:Bill Clinton.jpg",
+    "File:George-W-Bush.jpeg",
+    "File:Al Gore, Vice President of the United States, official portrait 1994.jpg",
+    "File:Mike Pence official Vice Presidential portrait.jpg",
+    "File:Dick Cheney.jpg",
+]
+
+
+def same_caption():
+    """Download CAPTION into caption/, cut square from the top as in portrait(); return their credit lines."""
+    (ASSETS / "caption").mkdir(parents=True, exist_ok=True)
+    credits = []
+    for i, title in enumerate(CAPTION):
+        thumb, licence, author, page = describe(title)
+        if licence not in ALLOWED:
+            raise SystemExit(f"{title} is {licence!r}, not CC0 or public domain")
+        source = ASSETS / "caption" / f"{i}.src"
+        source.write_bytes(fetch(thumb))
+        crop = "crop=iw:iw:0:ih*0.05,scale=384:384"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-vf", crop, "-quality", "84", str(ASSETS / "caption" / f"{i}.webp")], check=True)
+        source.unlink()
+        author = re.sub(r"\[\d+\]", "", author).replace("Unknown photographerUnknown photographer", "unknown photographer").rstrip(". ")
+        name = title.removeprefix("File:")
+        credits.append(f"- `caption/{i}.webp`: {name}, by {author}. {licence}. {page}")
+        print("wrote", f"caption/{i}.webp", "|", licence, "|", author)
+    return credits
 
 
 def download(files, folder, size):

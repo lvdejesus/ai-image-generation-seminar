@@ -8,11 +8,12 @@ import { live } from './live'
 import { generate } from './scenes/generate'
 import { intro } from './scenes/intro'
 import { latent } from './scenes/latent'
-import { noising } from './scenes/noising'
 import { demo, pipeline } from './scenes/pipeline'
 import { prompt } from './scenes/prompt'
-import { reverse } from './scenes/reverse'
+import { portraits } from './scenes/reverse'
+import { sectionPage } from './scenes/section'
 import { spine } from './scenes/spine'
+import { titlePage } from './scenes/title'
 import { training } from './scenes/training'
 
 const STAGE_W = 1920
@@ -27,7 +28,17 @@ const setup = document.querySelector<HTMLElement>('#setup')!
 
 // Scenes in order. A scene covers one or more consecutive beats.
 // spine(n) is step n of the diagram that grows through the talk.
-const builders: SceneBuilder[] = [intro, noising, training, reverse, generate, spine(1), prompt, spine(2), latent, spine(3), pipeline]
+// spine(0) is the whole system at once, before any of it is explained.
+const builders: SceneBuilder[] = [
+  titlePage,
+  sectionPage('I'), intro, spine(0),
+  sectionPage('II'), training,
+  sectionPage('III'), portraits,
+  sectionPage('IV'), generate, spine(1),
+  prompt, spine(2),
+  sectionPage('V'), latent, spine(3),
+  pipeline,
+]
 
 // starts[i] is the time at which beat i should begin if the talk is on budget.
 const starts = beats.map((_, i) => beats.slice(0, i).reduce((sum, b) => sum + b.seconds, 0))
@@ -68,7 +79,8 @@ function buildProgress() {
   beats.forEach((beat, i) => {
     const tick = el('div', 'tick')
     tick.style.flexGrow = String(beat.seconds)
-    if (i > 0 && beats[i - 1].section !== beat.section) tick.classList.add('section-start')
+    // The end (the demo) has no section, so it gets no mark.
+    if (i > 0 && beat.section !== '' && beats[i - 1].section !== beat.section) tick.classList.add('section-start')
     // Each tick is also a way to jump straight to its beat, for questions.
     tick.addEventListener('click', () => deck.jump(i))
     tick.addEventListener('mouseenter', () => {
@@ -126,8 +138,13 @@ function buildOverview() {
   top.append(el('h1', '', 'All beats'), el('p', '', `${beats.length} beats · ${clock(total)} · click one to jump to it · O or Esc to close`))
   overview.append(top)
 
-  for (const [numeral, title] of Object.entries(sections)) {
-    const group = beats.filter((b) => b.section === numeral)
+  // The sections, then the end (the demo), which has no section.
+  // The title page is in neither.
+  const groups = [
+    ...Object.entries(sections).map(([numeral, title]) => ({ numeral, title, group: beats.filter((b) => b.section === numeral) })),
+    { numeral: '', title: 'End', group: beats.filter((b, i) => i > 0 && b.section === '') },
+  ]
+  for (const { numeral, title, group } of groups) {
     const seconds = group.reduce((sum, b) => sum + b.seconds, 0)
 
     const heading = el('h2', 'ov-section')
@@ -181,7 +198,11 @@ function updateSetup() {
   const host = live.host()
   const text = state === 'ready' ? `Live demo connected · ${host}` : state === 'connecting' ? `Live demo: connecting to ${host}…` : 'Live demo not set up · click to paste its address'
   setup.querySelector<HTMLElement>('.dot')!.dataset.state = state === 'ready' ? 'live' : state === 'connecting' ? 'recorded' : 'idle'
-  setup.querySelector('span')!.textContent = setupNote || text
+  // Only the dot shows: green when connected, red when not. The words are a
+  // tooltip, and appear only when a pasted address could not be read.
+  setup.querySelector('span')!.textContent = setupNote
+  setupButton.title = setupNote || text
+  setupButton.setAttribute('aria-label', setupNote || text)
 }
 
 function showSetup(index: number) {

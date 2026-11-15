@@ -1,0 +1,39 @@
+/* Scene III.A to III.D (reverse.ts). These rules apply only in this scene. */
+
+/* A label stays on one line. The scene gives each label enough width. */
+.reverse .caption,
+.reverse .tag {
+  white-space: nowrap;
+}
+
+/* III.B: the photos with the same caption, which merge into the output. */
+.reverse .merge-photo {
+  position: absolute;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+/* III.A to III.C: a ring around the original that the output matches. */
+.reverse .answer-ring {
+  position: absolute;
+  border: 5px solid var(--accent);
+  border-radius: 22px;
+}
+
+/* III.A and III.B: error bars. A light track, filled in ink; the overall bar
+   is filled in the accent colour. */
+.reverse .error-bar {
+  border-radius: 999px;
+  background: rgba(246, 239, 220, 0.85);
+  box-shadow: 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.reverse .error-bar > i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--ink);
+}
+.reverse .error-bar.overall > i {
+  background: var(--accent);
+}

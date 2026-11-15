@@ -1,6 +1,7 @@
 # Image credits
 
 - `portrait.jpg`: President Barack Obama, official portrait, 6 December 2012. Official White House Photo by Pete Souza. Public domain. https://commons.wikimedia.org/wiki/File:President_Barack_Obama.jpg
+- `portrait2.jpg`: President Joe Biden, official portrait, 2021. Official White House Photo by Adam Schultz. Public domain. https://commons.wikimedia.org/wiki/File:Joe_Biden_presidential_portrait.jpg
 
 Photographs in `found/`, all from Wikimedia Commons:
 
@@ -15,6 +16,13 @@ Photographs in `found/`, all from Wikimedia Commons:
 - `found/8.webp`: Ocean Splashing on Rocks.jpg, by Wonderlane. CC0. https://commons.wikimedia.org/wiki/File:Ocean_Splashing_on_Rocks.jpg
 - `found/9.webp`: The Sea Cliff Bridge. NSW Aust. (21016079739).jpg, by Bernard Spragg. NZ from Christchurch, New Zealand. CC0. https://commons.wikimedia.org/wiki/File:The_Sea_Cliff_Bridge._NSW_Aust._(21016079739).jpg
 
+Photographs in `caption/`, more official portraits with the caption of portrait.jpg, all from Wikimedia Commons:
+
+- `caption/0.webp`: Bill Clinton.jpg, by Bob McNeely, The White House. Public domain. https://commons.wikimedia.org/wiki/File:Bill_Clinton.jpg
+- `caption/1.webp`: George-W-Bush.jpeg, by Eric Draper. Public domain. https://commons.wikimedia.org/wiki/File:George-W-Bush.jpeg
+- `caption/2.webp`: Al Gore, Vice President of the United States, official portrait 1994.jpg, by unknown photographer. Public domain. https://commons.wikimedia.org/wiki/File:Al_Gore,_Vice_President_of_the_United_States,_official_portrait_1994.jpg
+- `caption/3.webp`: Mike Pence official Vice Presidential portrait.jpg, by D. Myles Cullen. Public domain. https://commons.wikimedia.org/wiki/File:Mike_Pence_official_Vice_Presidential_portrait.jpg
+- `caption/4.webp`: Dick Cheney.jpg, by Karen Ballard, White House. Public domain. https://commons.wikimedia.org/wiki/File:Dick_Cheney.jpg
 Photographs in `collection/`, all from Wikimedia Commons:
 
 - `collection/0.webp`: Dog at Nørre Vorupør Strand.jpg, by W.carter. CC0. https://commons.wikimedia.org/wiki/File:Dog_at_N%C3%B8rre_Vorup%C3%B8r_Strand.jpg

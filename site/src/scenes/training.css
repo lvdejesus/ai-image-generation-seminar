@@ -1,0 +1,25 @@
+/* Training beats (5-12): rules for these slides only. */
+
+/* The captions of the collection: two lines under a card. */
+.training .card .caption {
+  margin-top: 8px;
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+/* A larger tag, for the words on the faded block of training images. */
+.training .tag.big {
+  font-size: 34px;
+}
+
+.training .number-grid > span {
+  border-radius: 8px;
+  font-size: 32px;
+  line-height: 1.12;
+}
+
+/* The two lines that join the patch on the portrait to its numbers. */
+.training .stroke.zoom {
+  stroke: var(--accent);
+  stroke-width: 3;
+}

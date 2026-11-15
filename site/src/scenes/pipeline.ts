@@ -1,24 +1,20 @@
-// Section V, beats 31 and 32: the live demo and the close. Beat 30, the
-// whole system, is the last step of the diagram in spine.ts.
+// The end, beat 34: the live demo, the last beat of the talk. It belongs to no section.
 import gsap from 'gsap'
-import { assets, chip, draw, el, fade, headline, idea, label, overlay, place, rise, shot, stroke, wordsIn, wordsOut } from '../kit'
+import './spine-prompt-pipeline.css'
+import { assets, el, headline, place, rise, shot, wordsIn } from '../kit'
 import { title } from '../beats'
 import { live } from '../live'
 import { NoisyImage } from '../noise'
-import { collage, LIGHTHOUSE_PROMPT } from './intro'
 
-// Beat 31: the live demo.
+// Beat 34: the live demo.
 const INPUT = { x: 104, y: 500, w: 760, h: 88 }
-const VIEW = { x: 1400, y: 640, size: 560 }
+const VIEW = { x: 1516, y: 640, size: 600 }
+/** The status lines may run to the left edge of the frame. */
+const STATUS_W = 1040
 /** Frames per second the demo plays at, however fast they arrive. */
 const RATE = 2.2
 /** How long to wait for the first live frame before using the recording. */
 const PATIENCE = 8000
-
-// Beat 32: what did not happen, what did, and the three ideas it took.
-const COLLAGE = { x: 300, y: 640, size: 280 }
-const FINAL = { x: 760, y: 620, size: 420 }
-const IDEAS = { x: 1100, y: 500, pitch: 96 }
 
 /** The live demo's controls, for the keyboard handler and the presenter line. */
 export const demo = {
@@ -29,22 +25,21 @@ export const demo = {
 }
 
 export function pipeline(root: HTMLElement) {
-  const yours = headline(root, title('31'))
-  const close = headline(root, title('32'))
-  const lines = overlay(root)
+  root.classList.add('spine-prompt-pipeline')
+  const yours = headline(root, title('34'))
 
-  // ---- Beat 31 furniture
+  // ---- Beat 34 furniture
   const inputTag = place(el('span', 'tag', 'Your prompt'), INPUT.x, INPUT.y - 38)
   const input = place(el('input', 'prompt-box live-input'), INPUT.x, INPUT.y, INPUT.w, INPUT.h)
   input.type = 'text'
   input.maxLength = 200
   input.spellcheck = false
   input.placeholder = 'type a prompt, then Enter'
-  const statusLine = place(el('p', 'live-status'), INPUT.x, INPUT.y + INPUT.h + 28, INPUT.w)
+  const statusLine = place(el('p', 'live-status'), INPUT.x, INPUT.y + INPUT.h + 28, STATUS_W)
   const dot = el('i', 'dot')
   const statusText = el('span')
   statusLine.append(dot, statusText)
-  const stepLine = place(el('p', 'live-step'), INPUT.x, INPUT.y + INPUT.h + 90, INPUT.w)
+  const stepLine = place(el('p', 'live-step'), INPUT.x, INPUT.y + INPUT.h + 90, STATUS_W)
   root.append(inputTag, input, statusLine, stepLine)
 
   // Until a run starts, the frame shows a recorded picture of pure noise.
@@ -62,7 +57,7 @@ export function pipeline(root: HTMLElement) {
     statusText.textContent = text
     dot.dataset.state = state
   }
-  const idle = () => say(live.status() === 'ready' ? 'Connected to the home GPU' : 'Not connected: Enter plays a recorded run', live.status() === 'ready' ? 'live' : 'idle')
+  const idle = () => say(live.status() === 'ready' ? 'Connected to the home GPU' : 'Not connected. Enter plays a recorded run.', live.status() === 'ready' ? 'live' : 'idle')
 
   function begin(count: number) {
     frames = []
@@ -87,7 +82,7 @@ export function pipeline(root: HTMLElement) {
     live.cancel()
     begin(assets.fallback.length)
     assets.fallback.forEach((frame, i) => add(i, frame))
-    say('Recorded run: a cat wearing a wizard hat, reading a book', 'recorded')
+    say('Playing a recorded run (a cat in a wizard hat, reading a book)', 'recorded')
   }
 
   function generate() {
@@ -132,48 +127,14 @@ export function pipeline(root: HTMLElement) {
     stepLine.textContent = `step ${Math.min(total - 1, Math.ceil(shown))} / ${total - 1}`
   })
 
-  // ---- Beat 32 furniture
-  const half = COLLAGE.size / 2
-  const pasted = place(collage(COLLAGE.size), COLLAGE.x - half, COLLAGE.y - half)
-  pasted.classList.add('grey')
-  root.append(pasted)
-  const cross = [
-    stroke(lines, `M${COLLAGE.x - half + 24} ${COLLAGE.y - half + 24} L${COLLAGE.x + half - 24} ${COLLAGE.y + half - 24}`, 'strike'),
-    stroke(lines, `M${COLLAGE.x + half - 24} ${COLLAGE.y - half + 24} L${COLLAGE.x - half + 24} ${COLLAGE.y + half - 24}`, 'strike'),
-  ]
-  const notThis = label(root, 'not searched, not combined', COLLAGE.x, COLLAGE.y + half + 20)
-  const ending = new NoisyImage(assets.three.lighthouse, 384, 1)
-  const final = shot(root, ending.canvas, FINAL.x, FINAL.y, FINAL.size)
-  const finalChip = chip(root, LIGHTHOUSE_PROMPT, FINAL.x, FINAL.y + FINAL.size / 2 + 44, 'accent')
-  const finalTag = place(el('span', 'tag', 'Denoised out of random noise, with three ideas'), IDEAS.x, IDEAS.y - 70, 720)
-  root.append(finalTag)
-  const ideaLines = [1, 2, 3].map((n) => idea(root, n, IDEAS.x, IDEAS.y + (n - 1) * IDEAS.pitch))
-  root.append(lines) // keep the strokes above the collage
-
-  // ---- Beat 31: the live demo.
-  const beat31 = gsap.timeline()
-  wordsIn(beat31, yours, 0)
-  beat31
+  // ---- Beat 34: the live demo.
+  const beat34 = gsap.timeline()
+  wordsIn(beat34, yours, 0)
+  beat34
     .fromTo(inputTag, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 0.6)
     .fromTo(input, { autoAlpha: 0, scaleX: 0, transformOrigin: '0 50%' }, { autoAlpha: 1, scaleX: 1, duration: 0.6, ease: 'power4.out' }, 0.6)
     .fromTo(viewFrame, { clipPath: 'inset(50% 50% 50% 50% round 14px)' }, { clipPath: 'inset(0% 0% 0% 0% round 14px)', duration: 0.8, ease: 'power3.inOut' }, 0.8)
-  rise(beat31, [statusLine, stepLine], 1.2, 0.1)
+  rise(beat34, [statusLine, stepLine], 1.2, 0.1)
 
-  // ---- Beat 32: the collage that never happened, and the image that did.
-  const beat32 = gsap.timeline()
-  wordsOut(beat32, yours, 0)
-  wordsIn(beat32, close, 0.4)
-  fade(beat32, [inputTag, input, statusLine, stepLine, viewFrame], 0)
-  beat32.fromTo(pasted, { autoAlpha: 0, scale: 0.7 }, { autoAlpha: 1, scale: 1, duration: 0.5, ease: 'back.out(1.6)' }, 0.6)
-  draw(beat32, cross[0], 1.1, 0.3)
-  draw(beat32, cross[1], 1.3, 0.3)
-  rise(beat32, notThis, 1.4)
-  beat32
-    .fromTo(final, { autoAlpha: 0, scale: 0.85 }, { autoAlpha: 1, scale: 1, duration: 0.5, ease: 'back.out(1.6)' }, 1.6)
-    .to(ending, { frame: 6, duration: 2.2, ease: 'none', onUpdate: ending.render }, 1.9)
-  rise(beat32, finalChip, 2.2)
-  rise(beat32, finalTag, 3.0)
-  rise(beat32, ideaLines, 3.3, 0.3)
-
-  return [beat31, beat32]
+  return [beat34]
 }

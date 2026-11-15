@@ -1,7 +1,7 @@
-// Section I, beats 1-4: the question, the misconception, the answer shown on
-// the prompt from beat 1, and the three ideas the talk explains it with.
+// Section I, beats 1-3: the question, the misconception, and the answer shown
+// on the prompt from beat 1. Beat 4, the whole system, is spine(0).
 import gsap from 'gsap'
-import { arrow, assets, chip, draw, el, headline, idea, live, overlay, place, rise, shot, stroke, wordsIn, wordsOut } from '../kit'
+import { arrow, assets, chip, draw, el, headline, hold, live, overlay, place, rise, shot, stroke, wordsIn, wordsOut } from '../kit'
 import { title } from '../beats'
 import { NoisyImage, Static } from '../noise'
 
@@ -12,11 +12,8 @@ export const LIGHTHOUSE_PROMPT = 'a lighthouse on a cliff at sunset'
 const BOX = { x: 104, y: 470, w: 760, h: 88 }
 const FRAME = { x: 1216, y: 214, size: 600 }
 const TILE = { x: 104, y: 648, size: 136, pitch: 156, columns: 5 }
-// Beat 3: the lighthouse run, centred under the headline. Beat 4 moves it to
-// the left, with the three ideas on its right.
+// Beat 3: the lighthouse run, centred under the headline.
 const RUN = { x: 960, y: 650, size: 480 }
-const ASIDE = { x: 500, scale: 0.85 }
-const IDEAS = { x: 860, y: 470, pitch: 130 }
 
 /** One of the real photographs, as a square canvas. */
 function thumbnail(size: number, k: number) {
@@ -63,7 +60,6 @@ export function intro(root: HTMLElement) {
   const question = headline(root, title('1'), 1040)
   const misconception = headline(root, title('2'), 1040)
   const answer = headline(root, title('3'), 1500)
-  const three = headline(root, title('4'), 1500)
   const lines = overlay(root)
 
   // Prompt box, with the prompt typed into it.
@@ -128,22 +124,22 @@ export function intro(root: HTMLElement) {
   const run = new NoisyImage(assets.three.lighthouse, 384, 1)
   const runFrame = shot(root, run.canvas, RUN.x, RUN.y, RUN.size)
   const runChip = chip(root, LIGHTHOUSE_PROMPT, RUN.x, RUN.y + RUN.size / 2 + 44, 'accent')
-  const ideaLines = [1, 2, 3].map((n) => idea(root, n, IDEAS.x, IDEAS.y + (n - 1) * IDEAS.pitch, 'large'))
 
   // ---- Beat 1: the question, then a prompt going in and a mystery coming out.
   const typed = { n: 0 }
   const beat1 = gsap.timeline()
   wordsIn(beat1, question, 0)
+  let t = beat1.duration() + 0.1
   beat1
-    .fromTo(boxTag, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 0.55)
-    .fromTo(box, { scaleX: 0, transformOrigin: '0 50%' }, { scaleX: 1, duration: 0.6, ease: 'power4.out' }, 0.55)
-    .to(typed, { n: LIGHTHOUSE_PROMPT.length, duration: 1.2, ease: 'none', onUpdate: () => (typedText.textContent = LIGHTHOUSE_PROMPT.slice(0, Math.round(typed.n))) }, 1.0)
-  draw(beat1, toFrame, 2.2, 0.45)
+    .fromTo(boxTag, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, t)
+    .fromTo(box, { scaleX: 0, transformOrigin: '0 50%' }, { scaleX: 1, duration: 0.6, ease: 'power4.out' }, t)
+    .to(typed, { n: LIGHTHOUSE_PROMPT.length, duration: 1.2, ease: 'none', onUpdate: () => (typedText.textContent = LIGHTHOUSE_PROMPT.slice(0, Math.round(typed.n))) }, t + 0.45)
+  draw(beat1, toFrame, t + 1.65, 0.45)
   beat1
-    .fromTo(frame, { clipPath: 'inset(0% 100% 0% 0% round 24px)' }, { clipPath: 'inset(0% 0% 0% 0% round 24px)', duration: 0.7, ease: 'power3.inOut' }, 2.5)
-    .fromTo(mark, { scale: 0.4, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.6, ease: 'back.out(2)' }, 3.0)
+    .fromTo(frame, { clipPath: 'inset(0% 100% 0% 0% round 24px)' }, { clipPath: 'inset(0% 0% 0% 0% round 24px)', duration: 0.7, ease: 'power3.inOut' }, t + 1.95)
+    .fromTo(mark, { scale: 0.4, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.6, ease: 'back.out(2)' }, t + 2.45)
 
-  // ---- Beat 2: search results, pasted together into the frame, struck out.
+  // ---- Beat 2: search results, pasted together into the frame, then struck out.
   const beat2 = gsap.timeline()
   wordsOut(beat2, question, 0)
   wordsIn(beat2, misconception, 0.35)
@@ -151,16 +147,18 @@ export function intro(root: HTMLElement) {
     .to(mark, { scale: 0.4, autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, 0.2)
     .fromTo(tilesTag, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 0.5)
     .fromTo(tiles, { scale: 0.6, y: 24, autoAlpha: 0 }, { scale: 1, y: 0, autoAlpha: 1, duration: 0.45, ease: 'back.out(1.7)', stagger: 0.05 }, 0.5)
+  t = beat2.duration() + 0.1
   pieces.forEach((piece, q) => {
     // Lift off the photograph and land in the frame.
     beat2
-      .set(piece, { autoAlpha: 1 }, 1.4 + q * 0.35)
-      .to(piece, { x: 0, y: 0, scale: 1, duration: 0.8, ease: 'power3.inOut' }, 1.4 + q * 0.35)
+      .set(piece, { autoAlpha: 1 }, t + q * 0.35)
+      .to(piece, { x: 0, y: 0, scale: 1, duration: 0.8, ease: 'power3.inOut' }, t + q * 0.35)
   })
-  // The finished collage holds for a moment before it is struck out.
-  beat2.to([...pieces, ...tiles], { filter: 'grayscale(1) brightness(0.45)', duration: 0.4 }, 4.1)
-  draw(beat2, cross[0], 4.05, 0.3)
-  draw(beat2, cross[1], 4.25, 0.3)
+  // The finished collage turns grey and is struck out.
+  t = beat2.duration() + 0.1
+  beat2.to([...pieces, ...tiles], { filter: 'grayscale(1) brightness(0.45)', duration: 0.4 }, t)
+  draw(beat2, cross[0], t, 0.3)
+  draw(beat2, cross[1], t + 0.2, 0.3)
 
   // ---- Beat 3: everything clears; the static from beat 1 becomes the lighthouse.
   const beat3 = gsap.timeline()
@@ -174,15 +172,5 @@ export function intro(root: HTMLElement) {
   rise(beat3, runChip, 0.9)
   beat3.to(run, { frame: assets.three.lighthouse.length - 1, duration: 3, ease: 'power1.inOut', onUpdate: run.render }, 1.5)
 
-  // ---- Beat 4: the lighthouse moves aside for the three ideas.
-  const beat4 = gsap.timeline()
-  wordsOut(beat4, answer, 0)
-  wordsIn(beat4, three, 0.4)
-  const shift = ASIDE.x - RUN.x
-  beat4
-    .to(runFrame, { x: shift, scale: ASIDE.scale, duration: 0.8, ease: 'power3.inOut' }, 0.3)
-    .to(runChip, { x: shift, y: (-RUN.size / 2) * (1 - ASIDE.scale), duration: 0.8, ease: 'power3.inOut' }, 0.3)
-  rise(beat4, ideaLines, 1.0, 0.6)
-
-  return [beat1, beat2, beat3, beat4]
+  return [beat1, beat2, beat3]
 }

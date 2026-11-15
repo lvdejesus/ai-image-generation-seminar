@@ -1,0 +1,17 @@
+/* Beats 20-23: overrides for this scene only. */
+
+.generate .grid-result {
+  border-width: 6px;
+  border-radius: 16px;
+}
+
+.generate .grid-result .grid-box,
+.generate .own-guess .grid-box {
+  border-width: 3px;
+}
+
+/* The legend under the wheel: one line, readable from the back row. */
+.generate .wheel-legend {
+  font-size: 28px;
+  white-space: nowrap;
+}

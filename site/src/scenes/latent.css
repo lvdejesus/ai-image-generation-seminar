@@ -1,0 +1,13 @@
+/* Section V, beats 29-32. The rules apply only in the latent scene. */
+
+/* The RGB values on the zoomed pixels: a size the back row can read. */
+.latent .rgb-grid {
+  font-size: 30px;
+  line-height: 1.3;
+}
+
+/* A value that differs from the same value in the other picture: marked on the next key. */
+.latent .rgb-grid .value {
+  padding: 0 6px;
+  border-radius: 6px;
+}
