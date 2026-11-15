@@ -30,6 +30,10 @@ export function pipeline(root: HTMLElement) {
 
   // ---- Beat 34 furniture
   const inputTag = place(el('span', 'tag', 'Your prompt'), INPUT.x, INPUT.y - 38)
+  // The status, as a dot only: green when the home GPU is connected, accent
+  // while a recorded run plays, grey when not connected.
+  const dot = el('i', 'dot live-dot')
+  inputTag.append(dot)
   const input = place(el('input', 'prompt-box live-input'), INPUT.x, INPUT.y, INPUT.w, INPUT.h)
   input.type = 'text'
   input.maxLength = 200
@@ -60,6 +64,12 @@ export function pipeline(root: HTMLElement) {
   let patience = 0
   /** True while the slider follows the run; false once the presenter moves it. */
   let follow = true
+  /** True while the frame shows the recorded run. */
+  let recorded = false
+  const showStatus = () => {
+    dot.dataset.state = recorded ? 'recorded' : live.status() === 'ready' ? 'live' : 'idle'
+    dot.title = recorded ? 'Recorded run' : live.status() === 'ready' ? 'Connected' : live.status() === 'connecting' ? 'Connecting' : 'Not connected'
+  }
 
   /** Show step `index` in the frame, the label and the slider. */
   function showStep(index: number) {
@@ -92,6 +102,8 @@ export function pipeline(root: HTMLElement) {
     window.clearTimeout(patience)
     live.cancel()
     begin(assets.fallback.length)
+    recorded = true
+    showStatus()
     assets.fallback.forEach((frame, i) => add(i, frame))
   }
 
@@ -102,6 +114,8 @@ export function pipeline(root: HTMLElement) {
     if (live.status() !== 'ready') return playRecorded()
 
     begin(0)
+    recorded = false
+    showStatus()
     let arrived = false
     patience = window.setTimeout(() => !arrived && playRecorded(), PATIENCE)
     live.generate(text, {
@@ -124,6 +138,8 @@ export function pipeline(root: HTMLElement) {
     if (e.key === 'Enter') generate()
     if (e.key === 'Escape') input.blur()
   })
+  live.onStatus(showStatus)
+  showStatus()
   slider.addEventListener('input', () => {
     // Only steps that have arrived can be shown.
     let ready = 0

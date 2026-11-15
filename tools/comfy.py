@@ -16,6 +16,16 @@ TEXT_ENCODER = "qwen_3_06b_base.safetensors"
 VAE = "qwen_image_vae.safetensors"
 TURBO_LORA = "anima-turbo-lora.safetensors"
 
+# MOSS-Image, for the live demo: the instruction-tuned model, its Qwen3.5 text
+# encoder, the FLUX.2 VAE and an 8-step DMD LoRA (which runs at CFG 1).
+MOSS_UNET = "moss_image_sft_int8_convrot.safetensors"
+MOSS_TEXT_ENCODER = "qwen3.5_9b_int8_convrot.safetensors"
+MOSS_VAE = "flux2-vae.safetensors"
+MOSS_DMD_LORA = "MOSS_Image_SFT_8_steps_dmd_v0.1.safetensors"
+MOSS_NEGATIVE = "worst quality, bad anatomy, watermark, jpeg artifact"
+# MOSS-Image's default flow shift; Anima's is 3.
+MOSS_SHIFT = 5.0
+
 # Quality tags the model was trained with; "safe" is its rating tag.
 QUALITY = "masterpiece, best quality, score_9, highres, safe"
 NEGATIVE = "worst quality, low quality, bad quality, lowres, blurry, text, logo, signature, watermark, nsfw"
@@ -87,6 +97,15 @@ def anima(graph, turbo=False):
     return model, clip, vae
 
 
+def moss(graph):
+    """Add the MOSS-Image loaders with the 8-step DMD LoRA; returns (model, clip, vae) outputs."""
+    model = graph.out(graph.add("UNETLoader", unet_name=MOSS_UNET, weight_dtype="default"))
+    model = graph.out(graph.add("LoraLoaderModelOnly", model=model, lora_name=MOSS_DMD_LORA, strength_model=1.0))
+    clip = graph.out(graph.add("CLIPLoader", clip_name=MOSS_TEXT_ENCODER, type="moss_image", device="default"))
+    vae = graph.out(graph.add("VAELoader", vae_name=MOSS_VAE))
+    return model, clip, vae
+
+
 def conditioning(graph, clip, prompt, negative=NEGATIVE):
     positive = graph.out(graph.add("CLIPTextEncode", clip=clip, text=prompt))
     negative = graph.out(graph.add("CLIPTextEncode", clip=clip, text=negative))
@@ -127,8 +146,10 @@ def sigma(step, steps, shift=3.0):
     return shift * t / (1 + (shift - 1) * t)
 
 
-def empty_latent(graph, size=512):
-    """An empty latent in the shape Anima samples in, so noise made for it matches the sampler's."""
+def empty_latent(graph, size=512, kind="anima"):
+    """An empty latent in the shape the model samples in, so noise made for it matches the sampler's."""
+    if kind == "moss":
+        return graph.out(graph.add("EmptyFlux2LatentImage", width=size, height=size, batch_size=1))
     return graph.out(graph.add("EmptyHunyuanLatentVideo", width=size, height=size, length=1, batch_size=1))
 
 
@@ -157,17 +178,17 @@ def true_state(graph, state, zero, level):
     return graph.out(graph.add("LatentAdd", samples1=scaled, samples2=offset))
 
 
-def rollout(graph, model, positive, negative, vae, emit, *, seed, steps, cfg, stops):
+def rollout(graph, model, positive, negative, vae, emit, *, seed, steps, cfg, stops, kind="anima", size=512, shift=3.0):
     """A run from pure noise, emitting the real state at the start, after each step in `stops`, and at the end.
 
     `emit(latent)` is called once per recorded state, in order.
     """
-    empty = empty_latent(graph)
+    empty = empty_latent(graph, size, kind)
     noise, zero = noise_and_zero(graph, model, empty, seed, steps)
     emit(noise)
     latent, position = empty, 0
     for stop in stops:
         latent = sample(graph, model, positive, negative, latent, seed=seed, steps=steps, cfg=cfg, start=position, end=stop, add_noise=(position == 0), leftover=True)
-        emit(true_state(graph, latent, zero, sigma(stop, steps)))
+        emit(true_state(graph, latent, zero, sigma(stop, steps, shift)))
         position = stop
     emit(sample(graph, model, positive, negative, latent, seed=seed, steps=steps, cfg=cfg, start=position, add_noise=(position == 0)))

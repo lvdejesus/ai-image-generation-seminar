@@ -42,7 +42,7 @@ Anima 2B, run through the existing ComfyUI at `~/Projects/forks/comfy2`.
 
 - **Checkpoint:** `anima-base-v1.0`, with `qwen_3_06b_base` as text encoder and `qwen_image_vae`.
 - **Recorded runs:** 30 steps, CFG 4, Euler.
-- **Live demo:** `anima-turbo-lora`, 512×512, 8 steps, CFG 1. A warm run takes about 4 seconds including the per-step frames; the first run after loading takes longer.
+- **Live demo:** MOSS-Image (`moss_image_sft_int8_convrot`, with `qwen3.5_9b_int8_convrot` as text encoder and `flux2-vae`) and the `MOSS_Image_SFT_8_steps_dmd_v0.1` LoRA, 768×768, 8 steps, CFG 1, plain prompts with no quality tags. A warm run takes about 20 seconds; the first run after loading takes about 30. `SEMINAR_MODEL=anima` in `server/proxy.py` goes back to Anima turbo (512×512, about 4 seconds). The recorded fallback (`fallback/`) is the same MOSS workflow, seed 2024.
 - **It is an anime model**, which is used deliberately as the training data bias demonstration.
 - **Latent:** 16 channels at 1/8 resolution, so 512×512×3 becomes 64×64×16, about 12× fewer values.
 
@@ -172,7 +172,7 @@ What is still illustrative: the heavy noise on the four men in beat 14 is added 
 ## Before the talk
 
 - Pause anything else that submits jobs to this ComfyUI (the Discord bot), so the live prompt is not queued behind other work.
-- Run one live generation to load Anima and the turbo LoRA, so the next one is warm.
+- Run one live generation to load MOSS-Image and the DMD LoRA, so the next one is warm.
 - Stop the desktop from sleeping and run `./server/live.sh`. Send yourself the full site address with the fragment it prints, since the tunnel address is new on every start.
 - Open that address on the presenting machine and confirm the presenter line (T) shows `live ready`.
 - Keep a screen recording of the whole site as a last-resort fallback.
@@ -183,6 +183,6 @@ What is still illustrative: the heavy noise on the four men in beat 14 is added 
 2. **Hosting:** GitHub Pages from a public repo.
 3. **Live prompt:** suggested by the audience, typed by the presenter, who is the content filter. The model has no safety checker and the `safe` tag is not enough: in testing, prompts about women came out suggestive, while animals, places, objects and men were fine.
 4. **Training data bias:** shown deliberately in beat 22. With this plain prompt, the results in beat 14 are realistic men rather than anime, so the anime reveal happens only in beat 22.
-5. **Model:** Anima 2B through the existing ComfyUI, for recorded images and the live demo.
+5. **Model:** Anima 2B through the existing ComfyUI for the recorded images; MOSS-Image with an 8-step DMD LoRA for the live demo.
 6. **No U-Net to transformer beat:** removed on request; the talk ends on the answer to the opening question.
 7. **Tunnel:** a Cloudflare quick tunnel, not Tailscale Funnel.

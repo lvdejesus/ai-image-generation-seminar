@@ -397,7 +397,7 @@ export const beats: Beat[] = [
     id: '34',
     section: '',
     ref: 'Demo',
-    headline: 'Live, with *your* prompt.',
+    headline: 'Try it out!',
     say: 'Take a prompt from the audience, type it, and watch it denoise step by step.',
     visual: 'A prompt box and a large frame. 8 steps streamed from the home GPU; a recorded run plays if the connection is down.',
     seconds: 45,

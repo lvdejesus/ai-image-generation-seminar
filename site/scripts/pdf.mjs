@@ -25,8 +25,8 @@ await page.waitForSelector('.ov-card', { timeout: 30000 })
 // The live-demo setup control is for the presenter only.
 await page.addStyleTag({ content: '#setup { display: none !important; }' })
 
-// The demo's beat id, from its card in the overview.
-const demo = await page.evaluate(() => Array.from(document.querySelectorAll('.ov-card')).find((card) => /live, with/i.test(card.textContent))?.dataset.id)
+// The demo's beat id, from its card in the overview (its ref is "Demo").
+const demo = await page.evaluate(() => Array.from(document.querySelectorAll('.ov-card')).find((card) => card.querySelector('.ov-meta span')?.textContent === 'Demo')?.dataset.id)
 const last = await page.evaluate(() => document.querySelectorAll('.ov-card').length + 1)
 
 /** Wait until the deck rests at a new position, then return it. */

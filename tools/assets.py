@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 
-from comfy import NEGATIVE, QUALITY, Graph, anima, conditioning, preview, request, rollout, run, sample, sigma, true_state, upload_image
+from comfy import MOSS_NEGATIVE, MOSS_SHIFT, NEGATIVE, QUALITY, Graph, anima, conditioning, moss, preview, request, rollout, run, sample, sigma, true_state, upload_image
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "site" / "public" / "assets"
@@ -56,7 +56,8 @@ THREE_PROMPTS = {
 }
 # The seed of the step-1 guesses from pure noise in beat 16.
 HEDGE_SEED = 99
-FALLBACK_PROMPT = f"{QUALITY}, no humans, a cat wearing a wizard hat, reading a book, library, candlelight"
+# MOSS-Image takes plain sentences; Anima's quality tags make it paint text into the picture.
+FALLBACK_PROMPT = "a cat wearing a wizard hat, reading a book in a library, candlelight"
 # The car runs, for generating from pure noise and the colour wheel. The car
 # is in about the same place in every result, and its colour varies widely
 # from seed to seed, so the colour of one region shows how sure the model is.
@@ -193,12 +194,12 @@ def hedge():
 
 
 def fallback():
-    """The live demo's workflow, recorded: 8 turbo steps."""
+    """The live demo's workflow, recorded: MOSS-Image with its 8-step DMD LoRA, as in server/proxy.py."""
     g = Graph()
-    model, clip, vae = anima(g, turbo=True)
-    positive, negative = conditioning(g, clip, FALLBACK_PROMPT)
+    model, clip, vae = moss(g)
+    positive, negative = conditioning(g, clip, FALLBACK_PROMPT, MOSS_NEGATIVE)
     outputs = {}
-    rollout(g, model, positive, negative, vae, record(g, vae, outputs, lambda i: f"fallback/{i}.webp"), seed=5, steps=8, cfg=1.0, stops=range(1, 8))
+    rollout(g, model, positive, negative, vae, record(g, vae, outputs, lambda i: f"fallback/{i}.webp"), seed=2024, steps=8, cfg=1.0, stops=range(1, 8), kind="moss", size=768, shift=MOSS_SHIFT)
     execute(g, outputs)
 
 

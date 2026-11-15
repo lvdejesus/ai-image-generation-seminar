@@ -32,12 +32,15 @@ from aiohttp import web
 from PIL import Image
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools"))
-from comfy import QUALITY, Graph, anima, conditioning, rollout  # noqa: E402
+from comfy import MOSS_NEGATIVE, MOSS_SHIFT, QUALITY, Graph, anima, conditioning, moss, rollout  # noqa: E402
 
 COMFY = "127.0.0.1:8188"
 PORT = int(os.environ.get("SEMINAR_PORT", "8765"))
 TOKEN = os.environ.get("SEMINAR_TOKEN") or secrets.token_urlsafe(16)
 STEPS = 8
+# The model behind the demo: "moss" (MOSS-Image with its 8-step DMD LoRA) or "anima" (Anima with its turbo LoRA).
+MODEL = os.environ.get("SEMINAR_MODEL", "moss")
+SIZE = int(os.environ.get("SEMINAR_SIZE", "768"))
 MAX_PROMPT = 200
 # The output goes on a projector. This list only catches the obvious; the
 # presenter choosing what to type is the real filter.
@@ -57,20 +60,26 @@ def rejected(prompt):
 
 
 def workflow(prompt, seed):
-    """The fixed live workflow: 8 turbo steps, with the real state sent over the websocket at the start and after each step.
+    """The fixed live workflow: 8 fast steps (MOSS-Image with DMD, or Anima turbo), with the real state sent over the websocket at the start and after each step.
 
     Returns the graph and {node id: frame index}.
     """
     g = Graph()
-    model, clip, vae = anima(g, turbo=True)
-    positive, negative = conditioning(g, clip, f"{QUALITY}, {prompt}")
+    if MODEL == "moss":
+        model, clip, vae = moss(g)
+        positive, negative = conditioning(g, clip, prompt, MOSS_NEGATIVE)
+        shape = {"kind": "moss", "size": SIZE, "shift": MOSS_SHIFT}
+    else:
+        model, clip, vae = anima(g, turbo=True)
+        positive, negative = conditioning(g, clip, f"{QUALITY}, {prompt}")
+        shape = {}
     frames = {}
 
     def emit(latent):
         image = g.out(g.add("VAEDecode", samples=latent, vae=vae))
         frames[g.add("SaveImageWebsocket", images=image)] = len(frames)
 
-    rollout(g, model, positive, negative, vae, emit, seed=seed, steps=STEPS, cfg=1.0, stops=range(1, STEPS))
+    rollout(g, model, positive, negative, vae, emit, seed=seed, steps=STEPS, cfg=1.0, stops=range(1, STEPS), **shape)
     return g.nodes, frames
 
 
