@@ -9,8 +9,8 @@ import { NoisyImage } from '../noise'
 // Beat 34: the live demo.
 const INPUT = { x: 104, y: 500, w: 760, h: 88 }
 const VIEW = { x: 1516, y: 640, size: 600 }
-/** The status lines may run to the left edge of the frame. */
-const STATUS_W = 1040
+/** The step row is as wide as the prompt box. */
+const STEP_W = 760
 /** Frames per second the demo plays at, however fast they arrive. */
 const RATE = 2.2
 /** How long to wait for the first live frame before using the recording. */
@@ -35,12 +35,18 @@ export function pipeline(root: HTMLElement) {
   input.maxLength = 200
   input.spellcheck = false
   input.placeholder = 'type a prompt, then Enter'
-  const statusLine = place(el('p', 'live-status'), INPUT.x, INPUT.y + INPUT.h + 28, STATUS_W)
-  const dot = el('i', 'dot')
-  const statusText = el('span')
-  statusLine.append(dot, statusText)
-  const stepLine = place(el('p', 'live-step'), INPUT.x, INPUT.y + INPUT.h + 90, STATUS_W)
-  root.append(inputTag, input, statusLine, stepLine)
+  // The step slider: it follows the run as it plays, and can be dragged
+  // (or moved with the arrow keys) to show any step that has arrived.
+  const stepRow = place(el('div', 'live-step'), INPUT.x, INPUT.y + INPUT.h + 48, STEP_W)
+  const stepText = el('span', '', 'step 0')
+  const slider = el('input', 'live-slider')
+  slider.type = 'range'
+  slider.min = '0'
+  slider.max = String(assets.fallback.length - 1)
+  slider.step = '1'
+  slider.value = '0'
+  stepRow.append(stepText, slider)
+  root.append(inputTag, input, stepRow)
 
   // Until a run starts, the frame shows a recorded picture of pure noise.
   const view = new NoisyImage(assets.fallback[0], 384, 1)
@@ -52,21 +58,26 @@ export function pipeline(root: HTMLElement) {
   let total = 0
   let shown = 0
   let patience = 0
+  /** True while the slider follows the run; false once the presenter moves it. */
+  let follow = true
 
-  const say = (text: string, state: 'live' | 'recorded' | 'idle') => {
-    statusText.textContent = text
-    dot.dataset.state = state
+  /** Show step `index` in the frame, the label and the slider. */
+  function showStep(index: number) {
+    view.frame = index
+    view.render()
+    const step = Math.round(index)
+    stepText.textContent = `step ${step}`
+    slider.value = String(step)
   }
-  const idle = () => say(live.status() === 'ready' ? 'Connected to the home GPU' : 'Not connected. Enter plays a recorded run.', live.status() === 'ready' ? 'live' : 'idle')
 
   function begin(count: number) {
     frames = []
     total = count
     shown = 0
     view.setFrames([assets.fallback[0]])
-    view.frame = 0
-    view.render()
-    stepLine.textContent = ''
+    follow = true
+    if (count) slider.max = String(count - 1)
+    showStep(0)
   }
 
   function add(index: number, frame: CanvasImageSource) {
@@ -82,7 +93,6 @@ export function pipeline(root: HTMLElement) {
     live.cancel()
     begin(assets.fallback.length)
     assets.fallback.forEach((frame, i) => add(i, frame))
-    say('Playing a recorded run (a cat in a wizard hat, reading a book)', 'recorded')
   }
 
   function generate() {
@@ -92,16 +102,18 @@ export function pipeline(root: HTMLElement) {
     if (live.status() !== 'ready') return playRecorded()
 
     begin(0)
-    say('Generating on the home GPU…', 'live')
     let arrived = false
     patience = window.setTimeout(() => !arrived && playRecorded(), PATIENCE)
     live.generate(text, {
-      onStart: (count) => (total = count),
+      onStart: (count) => {
+        total = count
+        slider.max = String(count - 1)
+      },
       onFrame: (index, frame) => {
         arrived = true
         add(index, frame)
       },
-      onDone: () => say('Generated live on the home GPU', 'live'),
+      onDone: () => {},
       onError: () => playRecorded(),
     })
   }
@@ -112,19 +124,30 @@ export function pipeline(root: HTMLElement) {
     if (e.key === 'Enter') generate()
     if (e.key === 'Escape') input.blur()
   })
-  live.onStatus(() => total === 0 && idle())
-  idle()
+  slider.addEventListener('input', () => {
+    // Only steps that have arrived can be shown.
+    let ready = 0
+    while (frames[ready]) ready++
+    const wanted = Math.min(Number(slider.value), Math.max(0, ready - 1))
+    follow = false
+    shown = wanted
+    if (ready) showStep(wanted)
+    else slider.value = '0'
+  })
+  slider.addEventListener('keydown', (e) => {
+    // The arrow keys move the slider, not the deck.
+    e.stopPropagation()
+    if (e.key === 'Escape') slider.blur()
+  })
   demo.panic = playRecorded
   demo.typing = () => document.activeElement === input
 
   gsap.ticker.add((_time, deltaMs) => {
     let ready = 0
     while (frames[ready]) ready++
-    if (!total || shown >= ready - 1) return
+    if (!total || !follow || shown >= ready - 1) return
     shown = Math.min(ready - 1, shown + (deltaMs / 1000) * RATE)
-    view.frame = shown
-    view.render()
-    stepLine.textContent = `step ${Math.min(total - 1, Math.ceil(shown))} / ${total - 1}`
+    showStep(shown)
   })
 
   // ---- Beat 34: the live demo.
@@ -134,7 +157,7 @@ export function pipeline(root: HTMLElement) {
     .fromTo(inputTag, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 0.6)
     .fromTo(input, { autoAlpha: 0, scaleX: 0, transformOrigin: '0 50%' }, { autoAlpha: 1, scaleX: 1, duration: 0.6, ease: 'power4.out' }, 0.6)
     .fromTo(viewFrame, { clipPath: 'inset(50% 50% 50% 50% round 14px)' }, { clipPath: 'inset(0% 0% 0% 0% round 14px)', duration: 0.8, ease: 'power3.inOut' }, 0.8)
-  rise(beat34, [statusLine, stepLine], 1.2, 0.1)
+  rise(beat34, stepRow, 1.2)
 
   return [beat34]
 }

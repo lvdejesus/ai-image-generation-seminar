@@ -525,20 +525,27 @@ input.live-input::placeholder {
   color: var(--muted);
 }
 
-.live-status,
 .live-step {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 28px;
   font-family: var(--mono);
-  font-size: 28px;
-  color: var(--muted);
-}
-
-.live-step {
   font-size: 34px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+.live-step > span {
+  flex: none;
+  width: 5.5em;
+}
+
+input.live-slider {
+  flex: 1;
+  height: 40px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .dot {
